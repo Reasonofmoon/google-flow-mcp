@@ -20,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "mcp[cli]>=1.0.0",
+    "mcp[cli]>=1.0.0,<2",  # 0.1.0 uses mcp.server.fastmcp, removed in mcp 2.x
     "google-genai>=1.0.0",
     "Pillow>=10.0.0",
 ]

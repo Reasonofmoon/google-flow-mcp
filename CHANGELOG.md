@@ -9,6 +9,9 @@
 - `NOTICE`, `CHANGELOG.md`: Apache-2.0 수정 사실 표시
 - `scripts/sync-upstream.ps1`: PyPI 원본을 SHA256 확인 후 `upstream` 브랜치에 커밋
 
+### Fixed
+- `mcp` 의존성을 `<2`로 고정. mcp 2.x에서 `mcp.server.fastmcp`가 없어져 원본 0.1.0은 새로 설치하면 실행되지 않음 (나중에 `MCPServer`로 이전 검토)
+
 ### Changed
 - `pyproject.toml`: 프로젝트 URL을 이 포크로 변경 (원본 URL은 `Upstream`으로 유지)
 - `README.md`: 맨 위에 포크 안내 추가
