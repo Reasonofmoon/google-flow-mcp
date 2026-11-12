@@ -1,5 +1,8 @@
 # Google Flow MCP
 
+> **Reasonofmoon fork.** Based on [google-flow-mcp 0.1.0](https://pypi.org/project/google-flow-mcp/) by joshua-daniel-8090 (Apache-2.0).
+> 관리 방법은 [FORK.md](FORK.md), 바뀐 점은 [CHANGELOG.md](CHANGELOG.md)를 보세요.
+
 A Python MCP server that gives **Claude Desktop** direct access to Google AI's latest image and video generation models.
 
 | Capability | Model | Tier |
