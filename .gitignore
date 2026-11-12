@@ -13,3 +13,6 @@ google_flow_outputs/
 *.png
 *.jpg
 *.jpeg
+
+uv.lock
+generation_log.jsonl
