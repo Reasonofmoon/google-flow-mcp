@@ -1,90 +1,129 @@
-# Google Flow MCP
+# Google Flow MCP — a Flow-style studio inside your AI assistant
 
-> **Reasonofmoon fork.** Based on [google-flow-mcp 0.1.0](https://pypi.org/project/google-flow-mcp/) by joshua-daniel-8090 (Apache-2.0).
-> 관리 방법은 [FORK.md](FORK.md), 바뀐 점은 [CHANGELOG.md](CHANGELOG.md)를 보세요.
+Plan a storyboard, keep characters consistent, render shots, edit them, add music and a
+voice-over, and cut the film together, all by talking to Claude (or any MCP client).
 
-A Python MCP server that gives **Claude Desktop** Google's current image and video generation models,
-with cost guards, presets and a generation log.
+> **Not affiliated with Google.** This server does not control the Google Flow web app and does
+> not use Flow credits. It rebuilds Flow's way of working on the public **Gemini API**, so you
+> pay Google directly through your own API key.
+>
+> Fork of [google-flow-mcp 0.1.0](https://pypi.org/project/google-flow-mcp/) by joshua-daniel-8090
+> (Apache-2.0). See [CHANGELOG.md](CHANGELOG.md). 한국어 안내: [FORK.md](FORK.md).
 
-| Capability | Default model | List price (paid tier, checked 2026-11-13) |
-|---|---|---|
-| Fast image generation & editing | Nano Banana 2.1 (`gemini-nano-banana-2.1`) | ~$0.034 (1K) / $0.050 (2K) / $0.113 (4K) per image |
-| Best quality, text-heavy layouts | Nano Banana Pro (`gemini-3-pro-image`) | ~$0.134 (1K/2K) / $0.24 (4K) per image |
-| Cheapest drafts | Nano Banana 2 Lite (`gemini-3.1-flash-lite-image`) | ~$0.034 per 1K image |
-| Video with native audio, 3–15 s | Gemini Omni Flash (`gemini-omni-1.2-flash`) | ~$0.023/s (360p), $0.07/s (720p), $0.104/s (1080p), $0.209/s (4K) |
+## What makes it different
 
-**No free tier.** Every model above is "Not available" on the free tier, so the API key needs billing.
-Veo 3.1 Preview, used by 0.1.0, was shut down on 2026-10-22.
-
-## Tools
-
-| Tool | What it does |
+| In Google Flow | Here |
 |---|---|
-| `flow_generate_image` | Text → 1–4 images, presets and styles, up to 4K |
-| `flow_edit_image` | Edit an image with plain language (add, remove, extend canvas, swap background) |
-| `flow_generate_image_with_references` | Generate guided by up to 14 reference images |
-| `flow_generate_video` | Text (+ optional first/last frame, up to 6 reference images) → video with audio |
-| `flow_extend_video` | Continue or edit a clip (by `previous_interaction_id` or a local MP4) |
-| `flow_image_to_video` | Pipeline: anchor image → animated video |
-| `flow_list_presets` | Show format/style presets, active models and limits |
-| `flow_estimate_cost` | Price a request without generating |
-| `flow_usage_today` | Today's count and estimated spend from the log |
+| **Ingredients / Characters**: tag an asset to reuse it | `flow_ingredient_save`, then write `@mira` in any prompt. Reference images and a description are attached for you |
+| **Frames to Video** | A cheap keyframe per shot becomes the first frame of its video; first + last frame also works |
+| **Scenebuilder**: arrange, trim, preview, download | `flow_storyboard_plan` → `flow_storyboard_render` → `flow_assemble` (local ffmpeg, bundled) |
+| **Extend / edit / insert / remove** | `flow_extend_video`, `flow_edit_video` ("Add light snowfall", "Make this anime") |
+| **Camera controls** | `camera="push-in"`, `"orbit"`, `"drone"`, 18 presets or your own words |
+| **Draft at 360p for one third of the cost** | `quality="draft"`, then `"standard"` only for shots that work |
+| Project view | `flow_board` writes a self-contained HTML board with players |
 
-## Presets
+And three things the web app cannot do:
 
-`preset=` (format): `square`, `youtube-thumbnail` (16:9), `shorts` (9:16), `pinterest-pin` (2:3),
-`instagram-post` (4:5), `worksheet` (3:4), `banner` (21:9).
+- **The assistant looks at its own work.** Image tools return a preview, and `flow_review` returns
+  evenly spaced video frames, so the model can catch a broken hand or misspelled title before you do.
+- **Spending is guarded.** Every result shows an estimated price. Anything above a threshold returns
+  a quote first and needs your yes. Daily limits and a daily budget are on by default.
+- **Long jobs do not time out.** Shots render in parallel as background jobs; the tool returns after
+  a couple of minutes and `flow_project` shows progress.
 
-`style=`: `photo`, `flat-illustration`, `watercolor`, `kids-book`, `3d-clay`, `infographic`, `cinematic`.
+Music (Lyria) and narration (Gemini TTS, 130+ languages) are mixed in at assembly.
 
-Add your own with a JSON file and `FLOW_PRESETS_FILE`:
+## Try it without an API key
 
-```json
-{
-  "formats": {"tpt-cover": {"aspect_ratio": "1:1", "image_size": "2K", "note": "TPT cover"}},
-  "styles": {"moonlight": "soft pastel watercolor, warm lighting, children's book style"}
-}
+Set `FLOW_DEMO=1` and every tool works with local placeholder media: labelled cards for images,
+slow-zoom clips for video, a soft tone for audio. Nothing is sent to Google and nothing is billed,
+but projects, storyboards, previews, cost estimates, assembly and the board all behave for real.
+
+```bash
+pip install -e . && python examples/offline_demo.py demo_output   # then open demo_output/projects/paper-rocket/board.html
 ```
 
-## Settings (environment variables)
+In Claude Desktop, add `"FLOW_DEMO": "1"` to the server's `env` block. Remove it when you add a key.
 
-| Variable | Default | Meaning |
+## A film in one conversation
+
+> **You:** Make a 20-second vertical short about a girl who builds a paper rocket.
+>
+> **Assistant:** creates the project → saves `@mira` with a reference sheet → plans 4 shots →
+> generates 4 keyframes and shows you the contact sheet (about $0.13) → after your OK renders
+> 360p drafts (about $0.46) → reviews frames, re-renders one weak shot → adds a 30-second piano
+> clip and a Korean voice-over → assembles `paper-rocket.mp4` and opens the board.
+
+The same flow is available as ready-made prompts: `short_film`, `product_ad`, `social_image_set`.
+
+## Tools (21)
+
+**Quick jobs**
+
+| Tool | Does |
+|---|---|
+| `flow_generate_image` | Text → 1–4 images; `preset`, `style`, `@ingredient` tags; up to 4K |
+| `flow_edit_image` | Edit with plain language (add, remove, extend canvas, swap background) |
+| `flow_generate_image_with_references` | Up to 14 reference images |
+| `flow_generate_video` | Text (+ first/last frame, references, `camera`) → 3–15 s video with audio |
+| `flow_extend_video` | Continue a clip, up to 30 s total |
+| `flow_edit_video` | Change a clip or a storyboard shot with one sentence |
+| `flow_image_to_video` | Anchor image → video in one call |
+
+**Studio**
+
+| Tool | Does |
+|---|---|
+| `flow_project` | Create/open a project, or show status and the next step |
+| `flow_ingredient_save` | Save a character, object, location or style (optionally generate a reference sheet) |
+| `flow_storyboard_plan` | Set the shot list; returns keyframe, draft and standard cost estimates |
+| `flow_shot_update` | Rewrite a shot, pick a take, trim it |
+| `flow_storyboard_keyframes` | One still per shot + a contact sheet to check the look |
+| `flow_storyboard_render` | Render shots in the background at `draft` / `standard` / `high` |
+| `flow_generate_music` | Lyria: 30 s clip or full song |
+| `flow_generate_narration` | Gemini TTS voice-over, 30 voices, style control |
+| `flow_assemble` | Join takes, apply trims, mix music and narration (no API cost) |
+| `flow_review` | Return an image or video frames for the assistant to inspect |
+| `flow_board` | HTML board of the whole project |
+
+**Housekeeping:** `flow_list_presets`, `flow_estimate_cost`, `flow_usage_today`
+
+## Models and list prices
+
+Paid tier, Standard, checked 2026-11-13 on [the pricing page](https://aistudio.google.com/docs/pricing).
+Estimates only: Google bills by tokens.
+
+| Job | Default model | Price |
 |---|---|---|
-| `GOOGLE_API_KEY` | — | Paid Gemini API key (required) |
-| `FLOW_OUTPUT_DIR` | `~/google_flow_outputs` | Where files and the log go |
-| `FLOW_DEFAULT_IMAGE_MODEL` | `fast` | `fast`, `pro`, `lite` or a full model id |
-| `FLOW_MODEL_IMAGE_FAST` / `_PRO` / `_LITE` | see table above | Swap in a newer model without code changes |
-| `FLOW_MODEL_VIDEO` | `gemini-omni-1.2-flash` | Video model |
-| `FLOW_DAILY_IMAGE_LIMIT` | `50` | Images per day, `0` = no limit |
-| `FLOW_DAILY_VIDEO_LIMIT` | `5` | Video generations per day, `0` = no limit |
-| `FLOW_DAILY_BUDGET_USD` | `0` (off) | Max estimated spend per day |
-| `FLOW_VIDEO_CONFIRM_USD` | `0.5` | Videos estimated above this return a quote first; call again with `confirm_cost=true` |
-| `FLOW_PRESETS_FILE` | — | Extra presets (JSON) |
-| `FLOW_PRICES_FILE` | — | Price table overrides (JSON: `{"image": {...}, "video": {...}}`) |
-| `FLOW_LOG_FILE` | `<output>/generation_log.jsonl` | Generation log path |
+| Image, fast (default) | `gemini-nano-banana-2.1` | ~$0.034 (1K) / $0.050 (2K) / $0.113 (4K) |
+| Image, pro | `gemini-3-pro-image` | ~$0.134 (1K/2K) / $0.24 (4K) |
+| Image, lite | `gemini-3.1-flash-lite-image` | ~$0.034 (1K) |
+| Video | `gemini-omni-1.2-flash` | ~$0.023/s (360p), $0.07/s (720p), $0.104/s (1080p), $0.209/s (4K) |
+| Music | `lyria-3-clip-preview` / `lyria-3.5` | $0.04 per 30 s clip / $0.08 per song |
+| Narration | `gemini-3.8-flash-tts` | ~$0.0002/s (free tier available) |
 
-Limits and spend are counted from the local log, so they are estimates, not Google's billing.
+Image, video and music models have **no free tier**: the API key needs billing enabled.
+A 20-second, 4-shot film costs roughly $0.13 (keyframes) + $0.46 (draft) + $1.40 (720p) + $0.04 (music).
 
-## Output
+## Install
 
-Files are named `<YYYYMMDD_HHMMSS>_<kind>_<prompt-summary>[_n].<ext>`, e.g.
-`20261113_091500_image_neon-tokyo-alley_0.png`. Every call (success or error) appends one JSON line to
-`generation_log.jsonl`: time, tool, model, prompt, parameters, output paths, estimated cost, seconds,
-and the `interaction_id` you can use to continue a video.
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/). ffmpeg is bundled through `imageio-ffmpeg`.
 
-## Claude Desktop configuration
+```bash
+git clone https://github.com/Reasonofmoon/google-flow-mcp
+```
 
-Run this fork from a local checkout:
+Claude Desktop → `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "google-flow-dev": {
+    "google-flow": {
       "command": "uv",
-      "args": ["--directory", "C:\\path\\to\\google-flow-mcp", "run", "google-flow-mcp"],
+      "args": ["--directory", "/path/to/google-flow-mcp", "run", "google-flow-mcp"],
       "env": {
         "GOOGLE_API_KEY": "YOUR_PAID_GEMINI_API_KEY",
-        "FLOW_OUTPUT_DIR": "C:/Users/you/Pictures/google-flow"
+        "FLOW_OUTPUT_DIR": "/path/to/output"
       }
     }
   }
@@ -93,33 +132,61 @@ Run this fork from a local checkout:
 
 Config file: `%APPDATA%\Claude\claude_desktop_config.json` (Windows),
 `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS),
-`~/.config/Claude/claude_desktop_config.json` (Linux). Restart Claude Desktop after editing.
+`~/.config/Claude/claude_desktop_config.json` (Linux). Restart the app after editing.
+Then ask: *"Show me flow_list_presets."*
 
-## Usage examples
+## Settings
 
-- "Make a Pinterest pin in watercolor style: a cozy reading nook with the text 'Read More'"
-- "Generate a YouTube thumbnail with the pro model, 4K, big bold title 'AI in 5 minutes'"
-- "Remove the person on the left from C:/pics/beach.png"
-- "How much would a 10-second 1080p video cost?"
-- "Make an 8-second Shorts video of a paper airplane flying through a library, single continuous shot"
-- "Continue that video: the airplane lands on a desk"
+| Variable | Default | Meaning |
+|---|---|---|
+| `GOOGLE_API_KEY` | — | Gemini API key (required) |
+| `FLOW_OUTPUT_DIR` | `~/google_flow_outputs` | Files, log and `projects/` |
+| `FLOW_DEFAULT_IMAGE_MODEL` | `fast` | `fast`, `pro`, `lite` or a model id |
+| `FLOW_MODEL_IMAGE_FAST` / `_PRO` / `_LITE`, `FLOW_MODEL_VIDEO`, `FLOW_MODEL_MUSIC_CLIP` / `_SONG`, `FLOW_MODEL_TTS` | see above | Swap models without code changes |
+| `FLOW_DAILY_BUDGET_USD` | `5` | Estimated spend per day, `0` = off |
+| `FLOW_DAILY_IMAGE_LIMIT` / `FLOW_DAILY_VIDEO_LIMIT` | `100` / `20` | Per day, `0` = off |
+| `FLOW_VIDEO_CONFIRM_USD` | `0.5` | Video jobs above this return a quote first |
+| `FLOW_INLINE_PREVIEW` | `1` | Return previews to the assistant |
+| `FLOW_DEMO` | off | `1` = placeholder media, no API calls, nothing billed |
+| `FLOW_RENDER_WAIT_SECONDS` / `FLOW_RENDER_CONCURRENCY` | `150` / `2` | Storyboard render behavior |
+| `FLOW_PRESETS_FILE`, `FLOW_PRICES_FILE` | — | Your own presets / price table (JSON) |
+| `FLOW_PROJECTS_DIR`, `FLOW_LOG_FILE`, `FLOW_FFMPEG` | — | Path overrides |
 
-## Notes
+Limits and spend are counted from the local `generation_log.jsonl`, not from Google's billing.
 
-- Generated videos carry an invisible SynthID watermark.
-- Inline video data is limited to about 4 MB, so 1080p/4K use URI delivery and are downloaded automatically.
-- Video extension: 3–10 s per turn, up to 30 s total; uploaded clips must be 15 s or less.
-- English prompts are fully supported; other languages work but are not officially evaluated.
+## What a project looks like on disk
 
-## Development
-
-```bash
-pip install -e ".[dev]"
-pytest -v
+```
+projects/paper-rocket/
+  project.json        plan, ingredients, takes, spend (plain JSON)
+  board.html          open in a browser
+  ingredients/        reference images
+  keyframes/  shots/  audio/  renders/
 ```
 
-CI runs the tests on Python 3.11–3.13 against both `mcp` 1.x and 2.x. All Google API calls are mocked.
+The server never deletes project files; re-rendering adds takes.
+
+## Good to know
+
+- A `standard` render is a new generation from the same keyframe, so motion can differ from the draft.
+- `flow_review` shows frames only. The assistant cannot hear audio.
+- Video: 3–15 s per shot (3–10 s with a last frame), up to 6 reference images, 16:9 or 9:16.
+  Edits and extensions work on clips of 15 s or less.
+- English prompts are fully supported for video; other languages work but are not officially evaluated.
+- Images, video and audio carry Google's invisible SynthID watermark.
+- Some uploads are restricted by region or content (recognizable people, minors in the EEA/UK/CH).
+
+## Status
+
+Alpha. The test suite (49 tests, Python 3.11–3.13, `mcp` 1.x and 2.x) mocks Google's API and runs
+ffmpeg, Pillow, the full demo-mode workflow and a real stdio server process. Request shapes follow the official docs as of
+2026-11-13; please open an issue if a live call behaves differently.
+
+```bash
+pip install -e ".[dev]" && pytest -v
+```
 
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+"Google", "Gemini", "Flow", "Veo", "Lyria" and "Nano Banana" are trademarks of Google LLC.

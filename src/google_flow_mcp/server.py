@@ -53,6 +53,11 @@ INSTRUCTIONS = (
     "made unless the tool returned its path."
 )
 
+if config.demo():
+    from .demo import NOTICE as _DEMO_NOTICE
+
+    INSTRUCTIONS += "\n" + _DEMO_NOTICE + " Tell the user results are placeholders."
+
 mcp = _Server("google-flow-mcp", instructions=INSTRUCTIONS)
 
 # ── Client ────────────────────────────────────────────────────────────────────
@@ -65,16 +70,36 @@ def _get_client() -> genai.Client:
     if not api_key or api_key.startswith("YOUR_"):
         raise EnvironmentError(
             "GOOGLE_API_KEY is not set. Put a paid Gemini API key in the env block of "
-            "claude_desktop_config.json (get one at https://aistudio.google.com/apikey)."
+            "claude_desktop_config.json (get one at https://aistudio.google.com/apikey), "
+            "or set FLOW_DEMO=1 there to try every workflow with placeholder media for free."
         )
     return genai.Client(api_key=api_key)
 
 
-def get_client() -> genai.Client:
+def get_client():
     global _client
+    if config.demo():
+        from .demo import DemoClient
+
+        if not isinstance(_client, DemoClient):
+            _client = DemoClient()
+        return _client
     if _client is None:
         _client = _get_client()
     return _client
+
+
+def billed(est: float | None) -> float | None:
+    """Estimated cost that actually counts: zero in demo mode."""
+    return 0.0 if config.demo() else est
+
+
+def demo_note() -> str:
+    if not config.demo():
+        return ""
+    from .demo import NOTICE
+
+    return "\n" + NOTICE
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -136,6 +161,7 @@ def _previews(paths: Sequence[str]) -> list[bytes]:
 
 def _reply(text: str, previews: Sequence[bytes] = ()) -> Any:
     """Text plus inline JPEG previews the assistant can look at."""
+    text += demo_note()
     if not previews or not config.inline_preview():
         return text
     return [text, *(_Image(data=b, format="jpeg") for b in previews)]
@@ -200,9 +226,12 @@ async def _tracked(
     est_cost: float | None, work: Callable[[], Awaitable[tuple[list[str], dict]]],
 ) -> tuple[list[str], dict]:
     """Check daily limits, run the work, and append a line to the JSONL log."""
+    est_cost = billed(est_cost)
     ledger.check_limits(kind, count, est_cost)
     base = {"tool": tool, "kind": kind, "model": model, "prompt": prompt, "params": params,
             "count": count, "est_cost_usd": est_cost}
+    if config.demo():
+        base["demo"] = True
     t0 = time.monotonic()
     try:
         outputs, extra = await work()
@@ -261,7 +290,7 @@ def _check_video_args(aspect: str, resolution: str) -> None:
 
 def _cost_gate(est: float | None, what: str, confirm_cost: bool) -> Optional[str]:
     threshold = config.video_confirm_usd()
-    if confirm_cost or not threshold or est is None or est <= threshold:
+    if config.demo() or confirm_cost or not threshold or est is None or est <= threshold:
         return None
     return (
         f"NOT GENERATED YET. Estimated cost for {what}: {pricing.fmt_usd(est)} "
@@ -295,7 +324,7 @@ def _video_result(paths: list[str], extra: dict, est: float | None) -> str:
             "(pass as previous_interaction_id to flow_extend_video to continue or edit this clip)"
         )
     lines.append("Note: all generated videos carry an invisible SynthID watermark.")
-    return "\n".join(lines)
+    return "\n".join(lines) + demo_note()
 
 
 # ── Tool 1: Text → Image ─────────────────────────────────────────────────────
@@ -727,7 +756,7 @@ async def flow_list_presets() -> str:
         f"- ffmpeg: {'found' if media.ffmpeg_exe() else 'NOT FOUND (needed for flow_assemble and video review)'}",
         "\nLimits: " + _limits_text(),
     ]
-    return "\n".join(lines)
+    return "\n".join(lines) + demo_note()
 
 
 @mcp.tool(structured_output=False)
@@ -777,7 +806,7 @@ async def flow_usage_today() -> str:
     return (
         f"Today: {u['images']} image(s), {u['videos']} video(s), estimated ~${u['est_cost_usd']:.2f} "
         f"across {u['calls']} successful call(s).\nLimits: {_limits_text()}\nLog: {config.log_path()}"
-    )
+    ) + demo_note()
 
 
 # ── Studio tools (projects, storyboard, audio, review) ───────────────────────

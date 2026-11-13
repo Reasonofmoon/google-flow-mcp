@@ -82,6 +82,11 @@ def projects_dir() -> Path:
     return path
 
 
+def demo() -> bool:
+    """FLOW_DEMO=1: placeholder media, no API calls, nothing billed."""
+    return os.environ.get("FLOW_DEMO", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def inline_preview() -> bool:
     """Return small previews to the assistant so it can see what was made."""
     return _env("FLOW_INLINE_PREVIEW", "1").lower() not in ("0", "false", "no", "off")

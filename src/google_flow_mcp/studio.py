@@ -119,7 +119,7 @@ def _status_text(p: dict) -> str:
     lines.append(f"Films: {len(films)}" + (f" (latest: {films[-1]['path']})" if films else ""))
     lines.append(f"Estimated spend on this project: ~${float(p.get('spent_usd') or 0):.2f}")
     lines.append(f"Next: {project.next_step(p)}")
-    return "\n".join(lines)
+    return "\n".join(lines) + core.demo_note()
 
 
 # ── Project + ingredients ─────────────────────────────────────────────────────
@@ -217,7 +217,7 @@ async def flow_ingredient_save(
         )
         p = project.load(p["name"])
         p["ingredients"][k]["images"] = paths
-        project.add_spend(p, est)
+        project.add_spend(p, core.billed(est))
         project.save(p)
         item = p["ingredients"][k]
         note = f" Generated a reference sheet ({pricing.fmt_usd(est)})."
@@ -431,7 +431,7 @@ async def flow_storyboard_keyframes(
             s["error"] = ""
             if s["status"] in ("planned", "error"):
                 s["status"] = "keyframed"
-            project.add_spend(pj, each)
+            project.add_spend(pj, core.billed(each))
             project.save(pj)
             return paths[0]
 
@@ -514,7 +514,7 @@ async def _render_one(name: str, shot_id: int, quality: str, resolution: str, se
         s["selected_take"] = len(s["takes"]) - 1
         s["status"] = "rendered"
         s["error"] = ""
-        project.add_spend(p, est)
+        project.add_spend(p, core.billed(est))
         project.save(p)
         board.write(p)
         return paths[0]
@@ -714,7 +714,7 @@ async def flow_edit_video(
                            "interaction_id": extra.get("interaction_id"), "ts": _now(),
                            "est_cost_usd": est, "edit": prompt})
         s["selected_take"] = len(s["takes"]) - 1
-        project.add_spend(p, est)
+        project.add_spend(p, core.billed(est))
         project.save(p)
         board.write(p)
         return (f"Shot {shot} edited: take {len(s['takes'])} is now selected ({pricing.fmt_usd(est)}).\n{paths[0]}\n"
@@ -772,14 +772,14 @@ async def flow_generate_music(
     if p:
         p = project.load(p["name"])
         p.setdefault("audio", {})["music"] = {"path": paths[0], "prompt": prompt}
-        project.add_spend(p, est)
+        project.add_spend(p, core.billed(est))
         project.save(p)
         board.write(p)
         lines.append(f"Attached to project '{p['name']}' as background music.")
     if extra.get("lyrics") and not instrumental:
         lines.append("Lyrics / structure:\n" + extra["lyrics"])
     lines.append("Generated audio carries an inaudible SynthID watermark.")
-    return "\n".join(lines)
+    return "\n".join(lines) + core.demo_note()
 
 
 @mcp.tool(structured_output=False)
@@ -841,7 +841,7 @@ async def flow_generate_narration(
     if p:
         p = project.load(p["name"])
         p.setdefault("audio", {})["narration"] = {"path": paths[0], "prompt": spoken[:300], "seconds": secs}
-        project.add_spend(p, est)
+        project.add_spend(p, core.billed(est))
         project.save(p)
         board.write(p)
         planned = sum(s["duration"] for s in p["shots"])
