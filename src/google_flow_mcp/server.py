@@ -793,4 +793,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # Import the packaged module so studio tools register on the same server object.
+    from google_flow_mcp.server import main as _main
+
+    _main()
