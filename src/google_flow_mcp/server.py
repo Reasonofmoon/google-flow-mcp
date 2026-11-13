@@ -72,7 +72,18 @@ def _explain(exc: Exception) -> str:
     text = str(exc).strip() or type(exc).__name__
     if not isinstance(exc, (ValueError, RuntimeError, OSError, TimeoutError)):
         text = f"{type(exc).__name__}: {text}"
-    return text[:1500]
+    text = text[:1300]
+    low = text.lower()
+    if "not found" in low and "model" in low:
+        text += (
+            f"\nHint: this server calls the Gemini API at version '{config.api_version()}'. The key may not "
+            "have this model, or the model was renamed: check the FLOW_MODEL_* settings (flow_list_presets "
+            "shows the names in use) against https://aistudio.google.com/docs/models."
+        )
+    elif "402" in text or "prepayment" in low or "billing" in low:
+        text += ("\nHint: image, video and music models need a key from a project with billing enabled "
+                 "and a positive balance (free-tier keys do not work).")
+    return text
 
 
 def tool() -> Callable:
@@ -112,7 +123,9 @@ def _get_client() -> genai.Client:
             "claude_desktop_config.json (get one at https://aistudio.google.com/apikey), "
             "or set FLOW_DEMO=1 there to try every workflow with placeholder media for free."
         )
-    return genai.Client(api_key=api_key)
+    # google-genai 3.x defaults to the stable 'v1' API, where Gemini Omni (video), Lyria (music) and
+    # the 3.8 TTS models do not exist yet: every call answers 404 "model not found". They live on v1beta.
+    return genai.Client(api_key=api_key, http_options={"api_version": config.api_version()})
 
 
 def get_client():
@@ -811,6 +824,7 @@ async def flow_list_presets() -> str:
         f"- video: {config.video_model()}",
         f"- music: {config.music_model('clip')} (30 s clip), {config.music_model('song')} (full song)",
         f"- narration: {config.tts_model()}",
+        f"- Gemini API version: {config.api_version()}",
         f"- ffmpeg: {'found' if media.ffmpeg_exe() else 'NOT FOUND (needed for flow_assemble and video review)'}",
         "\nLimits: " + _limits_text(),
     ]

@@ -2,6 +2,22 @@
 
 원본(upstream)과 다른 점만 적습니다. 원본 버전은 `upstream-v*` 태그를 보세요.
 
+## 0.3.3 - 2026-11-13
+
+실제 유료 키로 한 첫 호출에서 찾은 문제를 고쳤다.
+
+### Fixed
+- **영상·음악·내레이션이 모두 404 "model not found"로 실패하던 문제.** `google-genai` 3.x는 기본으로 `v1` 주소에 요청하는데, `gemini-omni-1.2-flash`, Lyria, Gemini 3.8 TTS는 `v1beta`에만 있다(2026-11-13 모델 조회로 확인: `v1`은 404, `v1beta`는 정상). 클라이언트를 `v1beta`로 만들도록 고쳤다. 키나 결제 문제가 아니었다
+
+### Added
+- `FLOW_API_VERSION`(기본 `v1beta`), `flow_list_presets`에 사용 중인 API 버전 표시
+- "model not found"와 402 오류에 원인을 좁혀 주는 안내 문구 추가
+
+### Docs
+- `README.ko.md`: README 한국어판 추가. 영어판과 서로 링크
+- README에 문제 해결 표, Claude Code 등록 명령, 어떤 API 키를 써야 하는지(무료 모델 조회 포함), 완전 종료 안내, 실제 API 검증 상태 추가
+- `FORK.md`를 관리자용 문서로 줄였다. 사용법은 `README.ko.md`로 옮김
+
 ## 0.3.2 - 2026-11-13
 
 공개 저장소를 깨끗한 환경에서 처음 사용자처럼 설치해 써 보고 찾은 문제를 고쳤다.

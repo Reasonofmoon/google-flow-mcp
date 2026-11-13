@@ -82,6 +82,11 @@ def projects_dir() -> Path:
     return path
 
 
+def api_version() -> str:
+    """Gemini API version. 'v1beta' has every model this server uses; 'v1' lacks video, music and TTS."""
+    return _env("FLOW_API_VERSION", "v1beta")
+
+
 def demo() -> bool:
     """FLOW_DEMO=1: placeholder media, no API calls, nothing billed."""
     return os.environ.get("FLOW_DEMO", "").strip().lower() in ("1", "true", "yes", "on")

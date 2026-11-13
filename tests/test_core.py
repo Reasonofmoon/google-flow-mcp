@@ -262,6 +262,23 @@ async def test_usage_and_estimate(client):
     assert pricing.music_cost("lyria-3-clip-preview") == 0.04
 
 
+def test_client_uses_v1beta_where_video_music_and_tts_models_live(monkeypatch, mocker):
+    """Found by the first live call: the SDK default 'v1' answers 404 for gemini-omni-1.2-flash."""
+    made = mocker.patch.object(server.genai, "Client")
+    monkeypatch.setenv("GOOGLE_API_KEY", "real-looking-key")
+    server._get_client()
+    assert made.call_args.kwargs["http_options"] == {"api_version": "v1beta"}
+    monkeypatch.setenv("FLOW_API_VERSION", "v1alpha")
+    server._get_client()
+    assert made.call_args.kwargs["http_options"] == {"api_version": "v1alpha"}
+
+
+def test_model_not_found_error_gets_a_hint():
+    text = server._explain(Exception("Error code: 404 - Model 'gemini-omni-1.2-flash' not found."))
+    assert "FLOW_MODEL_" in text and "v1beta" in text
+    assert "billing enabled" in server._explain(RuntimeError("402 prepayment credits are depleted"))
+
+
 def test_placeholder_key_is_rejected(monkeypatch):
     monkeypatch.setenv("GOOGLE_API_KEY", "YOUR_GOOGLE_AI_STUDIO_KEY")
     with pytest.raises(EnvironmentError):
