@@ -157,6 +157,10 @@ def _seconds(fmt: dict, default: int = 5) -> int:
     return max(1, min(15, int(raw))) if raw.isdigit() else default
 
 
+# interaction id -> "16:9" / "9:16", so an edit or extension keeps the shape of its source
+_ASPECTS: dict[str, str] = {}
+
+
 async def _video(text: str, base: Optional[Image.Image], fmt: dict, label: str) -> bytes:
     w, h = _SIZES["9:16" if fmt.get("aspect_ratio") == "9:16" else "16:9"]
     if fmt.get("resolution") == "360p":
@@ -198,8 +202,12 @@ class _Interactions:
         if model.startswith("lyria"):
             return _interaction("audio", tone(12, (261.6, 329.6, 392.0)), "audio/wav")
         if fmt.get("type") == "video" or "omni" in model or "veo" in model:
-            label = "edit/extend" if kw.get("previous_interaction_id") else "video"
-            return _interaction("video", await _video(text, _first_image(kw.get("input")), fmt, label), "video/mp4")
+            prev = kw.get("previous_interaction_id")
+            label = "edit/extend" if prev else "video"
+            fmt = {**fmt, "aspect_ratio": fmt.get("aspect_ratio") or _ASPECTS.get(str(prev), "16:9")}
+            result = _interaction("video", await _video(text, _first_image(kw.get("input")), fmt, label), "video/mp4")
+            _ASPECTS[result.id] = fmt["aspect_ratio"]
+            return result
         size = _SIZES.get(str(fmt.get("aspect_ratio") or "1:1"), (720, 720))
         return _interaction("image", _png(card(text, size, "image")), "image/png")
 

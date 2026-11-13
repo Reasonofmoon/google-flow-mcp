@@ -8,13 +8,27 @@ on:
 
 jobs:
   test:
-    name: Test (Python ${{ matrix.python-version }}, mcp ${{ matrix.mcp }})
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }}, mcp ${{ matrix.mcp }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONUTF8: "1"
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.11", "3.12", "3.13"]
         mcp: ["<2", ">=2,<3"]
+        include:
+          # the same checks where most desktop MCP clients actually run
+          - os: windows-latest
+            python-version: "3.12"
+            mcp: ">=2,<3"
+          - os: macos-latest
+            python-version: "3.12"
+            mcp: ">=2,<3"
 
     steps:
       - uses: actions/checkout@v4
@@ -40,8 +54,11 @@ jobs:
         if: matrix.python-version == '3.12' && matrix.mcp == '>=2,<3'
         run: python examples/offline_demo.py demo_output
 
+      - name: MCP smoke test over stdio (demo mode, then no key)
+        run: python examples/mcp_smoke_test.py smoke_output
+
       - name: Upload demo project
-        if: matrix.python-version == '3.12' && matrix.mcp == '>=2,<3'
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.mcp == '>=2,<3'
         uses: actions/upload-artifact@v4
         with:
           name: offline-demo

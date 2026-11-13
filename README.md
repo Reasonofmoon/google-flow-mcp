@@ -229,6 +229,17 @@ Config file: `%APPDATA%\Claude\claude_desktop_config.json` (Windows),
 `~/.config/Claude/claude_desktop_config.json` (Linux). Restart the app after editing.
 Then ask: *"Show me flow_list_presets."*
 
+### Check your install
+
+```bash
+python examples/mcp_smoke_test.py
+```
+
+This starts the real stdio server, speaks MCP to it and makes a whole film in demo mode
+(project, ingredient, storyboard, keyframes, background render, edit, music, narration,
+assembly, review, board), then checks that a missing key produces a helpful error.
+No API key, nothing billed. Expect `SUMMARY 26/26 checks passed`.
+
 ## Settings
 
 <details>
@@ -278,10 +289,11 @@ The server never deletes project files; re-rendering adds takes.
 
 ## Status
 
-Alpha. The test suite (49 tests, Python 3.11–3.13, `mcp` 1.x and 2.x) mocks Google's API and runs
-ffmpeg, Pillow, the full demo-mode workflow and a real stdio server process. Request shapes follow
-the official docs as of 2026-11-13; **no live API generation has been verified yet**, so please
-open an issue if a real call behaves differently.
+Alpha. CI runs on Linux (Python 3.11–3.13, `mcp` 1.x and 2.x), Windows and macOS: 49 tests that
+mock Google's API and run ffmpeg and Pillow for real, plus the stdio smoke test above against a
+live server process. Request shapes follow the official docs as of 2026-11-13;
+**no live API generation has been verified yet**, so please open an issue if a real call behaves
+differently.
 
 ```bash
 pip install -e ".[dev]" && pytest -v

@@ -125,7 +125,7 @@ def _status_text(p: dict) -> str:
 # ── Project + ingredients ─────────────────────────────────────────────────────
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_project(
     name: Optional[str] = None,
     title: Optional[str] = None,
@@ -171,7 +171,7 @@ async def flow_project(
     return _status_text(p) + (f"\nOther projects: {', '.join(others)}" if others else "")
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_ingredient_save(
     name: str,
     description: str,
@@ -242,7 +242,7 @@ def _plan_costs(p: dict, shots: list[dict]) -> str:
             f"standard render (720p) {pricing.fmt_usd(std)}.")
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_storyboard_plan(
     shots: list[dict],
     mode: str = "replace",
@@ -301,7 +301,7 @@ async def flow_storyboard_plan(
     return "\n".join(lines)
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_shot_update(
     shot: int,
     prompt: Optional[str] = None,
@@ -375,7 +375,7 @@ async def flow_shot_update(
     return f"Shot {shot} updated: {', '.join(changed)}."
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_storyboard_keyframes(
     shots: Optional[list[int]] = None,
     model: Optional[str] = None,
@@ -520,7 +520,7 @@ async def _render_one(name: str, shot_id: int, quality: str, resolution: str, se
         return paths[0]
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_storyboard_render(
     shots: Optional[list[int]] = None,
     quality: str = "draft",
@@ -622,7 +622,7 @@ async def flow_storyboard_render(
 # ── Editing, audio, assembly ──────────────────────────────────────────────────
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_edit_video(
     prompt: str,
     shot: Optional[int] = None,
@@ -656,6 +656,7 @@ async def flow_edit_video(
     seconds = 10.0
     src = video_path
     prev = previous_interaction_id
+    aspect: Optional[str] = None
     if shot is not None:
         p = project.load(project_name)
         s = project.get_shot(p, shot)
@@ -664,6 +665,7 @@ async def flow_edit_video(
             raise ValueError(f"Shot {shot} has no take yet. Render it first.")
         src, prev, seconds = take["path"], take.get("interaction_id"), float(s["duration"])
         resolution = resolution or take.get("resolution")
+        aspect = p["aspect_ratio"]  # keep a vertical project vertical
         out = project.sub(p, "shots")
         kind = f"s{int(shot):02d}-edit"
     else:
@@ -674,6 +676,7 @@ async def flow_edit_video(
                 raise ValueError(f"Video not found: {src}")
             if media.ffmpeg_exe():
                 seconds = (await media.probe(Path(src).expanduser()))["duration"] or 10.0
+                aspect = await core.clip_aspect(src)
     resolution = resolution or "720p"
     if resolution not in core.VIDEO_RESOLUTIONS:
         raise ValueError(f"resolution must be one of {core.VIDEO_RESOLUTIONS}; got {resolution}.")
@@ -686,6 +689,8 @@ async def flow_edit_video(
     if gate:
         return gate
     fmt: dict = {"type": "video", "resolution": resolution}
+    if aspect:
+        fmt["aspect_ratio"] = aspect
     if resolution in ("1080p", "4k"):
         fmt["delivery"] = "uri"
 
@@ -722,7 +727,7 @@ async def flow_edit_video(
     return core._video_result(paths, extra, est)
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_generate_music(
     prompt: str,
     kind: str = "clip",
@@ -782,7 +787,7 @@ async def flow_generate_music(
     return "\n".join(lines) + core.demo_note()
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_generate_narration(
     text: str,
     voice: str = "Kore",
@@ -851,7 +856,7 @@ async def flow_generate_narration(
     return "\n".join(lines)
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_assemble(
     shots: Optional[list[int]] = None,
     with_music: bool = True,
@@ -941,7 +946,7 @@ async def flow_assemble(
 # ── Review + board ────────────────────────────────────────────────────────────
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_review(path: str, frames: int = 6) -> Any:
     """
     Look at a generated file: returns the image, or evenly spaced frames of a video.
@@ -974,7 +979,7 @@ async def flow_review(path: str, frames: int = 6) -> Any:
     return [text, core._Image(data=sheet, format="jpeg")]
 
 
-@mcp.tool(structured_output=False)
+@core.tool()
 async def flow_board(open_in_browser: bool = False, project_name: Optional[str] = None) -> str:
     """
     Write the project's HTML board (ingredients, storyboard with players, audio, latest film).

@@ -24,7 +24,8 @@ async def test_tool_call_returns_text_and_image_blocks(tmp_path):
 
 def test_stdio_server_speaks_mcp(tmp_path):
     """Start `python -m google_flow_mcp` and talk JSON-RPC to it like a desktop client does."""
-    env = {**os.environ, "FLOW_OUTPUT_DIR": str(tmp_path), "PYTHONUNBUFFERED": "1"}
+    env = {k: v for k, v in os.environ.items() if k not in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "FLOW_DEMO")}
+    env.update({"FLOW_OUTPUT_DIR": str(tmp_path), "PYTHONUNBUFFERED": "1"})
     proc = subprocess.Popen([sys.executable, "-m", "google_flow_mcp"], stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", env=env)
     guard = threading.Timer(60, proc.kill)
@@ -69,6 +70,19 @@ def test_stdio_server_speaks_mcp(tmp_path):
 
         send({"jsonrpc": "2.0", "id": 5, "method": "prompts/list"})
         assert {p["name"] for p in reply(5)["prompts"]} == {"short_film", "product_ad", "social_image_set"}
+
+        # A failing tool must tell the client why (mcp 2.x hides non-ToolError messages).
+        send({"jsonrpc": "2.0", "id": 6, "method": "tools/call",
+              "params": {"name": "flow_generate_image", "arguments": {"prompt": "a red apple"}}})
+        failed = reply(6)
+        assert failed["isError"] is True
+        message = failed["content"][0]["text"]
+        assert "GOOGLE_API_KEY" in message and "FLOW_DEMO=1" in message, message
+
+        send({"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+              "params": {"name": "flow_shot_update", "arguments": {"shot": 9, "duration": 5}}})
+        failed = reply(7)
+        assert failed["isError"] is True and "Shot 9 not found" in failed["content"][0]["text"]
     finally:
         guard.cancel()
         proc.stdin.close()
