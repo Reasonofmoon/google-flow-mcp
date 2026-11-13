@@ -2,7 +2,7 @@
 
 # 이 저장소 사용·관리 안내 (한국어)
 
-`google-flow-mcp`를 고쳐 만든 Reasonofmoon 포크입니다. 지금 버전은 0.3.1입니다.
+`google-flow-mcp`를 고쳐 만든 Reasonofmoon 포크입니다. 지금 버전은 0.3.2입니다.
 Google Flow 웹앱을 조종하는 도구가 아닙니다. Flow에서 하던 작업 방식을 Gemini API로 다시 만든 것이고, 요금은 내 Gemini API 키로 Google에 직접 냅니다.
 
 ## 1. 무엇을 할 수 있나
@@ -47,7 +47,7 @@ Claude에게는 그냥 말하면 됩니다. 예: "종이 로켓을 만드는 아
 
 ## 3. 키 없이 먼저 써 보기 (데모 모드)
 
-`claude_desktop_config.json`의 `google-flow-dev` → `env`에 한 줄을 추가합니다.
+`claude_desktop_config.json`에서 이 서버 항목의 `env`에 한 줄을 추가합니다.
 
 ```json
 "FLOW_DEMO": "1"
@@ -62,15 +62,15 @@ Claude에게는 그냥 말하면 됩니다. 예: "종이 로켓을 만드는 아
 
 ## 4. Claude Desktop 설정
 
-`%APPDATA%\Claude\claude_desktop_config.json`의 `mcpServers`에 아래 항목이 있습니다(2026-11-13 추가).
+`%APPDATA%\Claude\claude_desktop_config.json`의 `mcpServers`에 아래 항목을 넣습니다. 경로는 내 PC에 맞게 바꿉니다.
 
 ```json
-"google-flow-dev": {
-  "command": "C:\\Users\\crescent\\.local\\bin\\uv.exe",
-  "args": ["--directory", "C:\\Users\\crescent\\projects\\google-flow-mcp", "run", "google-flow-mcp"],
+"google-flow": {
+  "command": "uv",
+  "args": ["--directory", "C:\\path\\to\\google-flow-mcp", "run", "google-flow-mcp"],
   "env": {
     "GOOGLE_API_KEY": "YOUR_GOOGLE_AI_STUDIO_KEY",
-    "FLOW_OUTPUT_DIR": "C:/Users/crescent/Pictures/google-flow"
+    "FLOW_OUTPUT_DIR": "C:/path/to/output"
   }
 }
 ```
@@ -80,6 +80,14 @@ Claude에게는 그냥 말하면 됩니다. 예: "종이 로켓을 만드는 아
 3. "flow_list_presets 보여줘"라고 해서 목록이 나오면 연결된 것입니다.
 
 이 항목은 작업 폴더에 지금 체크아웃된 코드를 실행합니다. 평소에는 `main`에 두세요.
+
+### 설치가 제대로 됐는지 확인하기
+
+```bash
+python examples/mcp_smoke_test.py
+```
+
+실제 서버를 띄워 MCP로 대화하면서 데모 모드로 영상 한 편을 끝까지 만들어 봅니다. API 키를 쓰지 않고 요금도 없습니다. 마지막 줄에 `SUMMARY 26/26 checks passed`가 나오면 정상입니다.
 
 ### 자주 바꾸는 설정 (env에 추가)
 
@@ -111,7 +119,7 @@ Claude에게는 그냥 말하면 됩니다. 예: "종이 로켓을 만드는 아
 ## 6. 코드 고치기
 
 ```powershell
-cd C:\Users\crescent\projects\google-flow-mcp
+cd C:\path\to\google-flow-mcp
 git switch -c feat/기능이름
 # src/google_flow_mcp/*.py 수정
 git commit -am "feat: ..."
@@ -144,9 +152,8 @@ git push origin upstream --tags
 git switch main; git merge upstream      # 거의 새로 썼으므로 충돌이 나면 내 쪽 기준
 ```
 
-## 8. 공개하기 전에 정할 것
+## 8. 아직 남은 것 (2026-11-13 공개 이후)
 
-- **이름.** PyPI의 `google-flow-mcp`는 원작자 소유라서 같은 이름으로 올릴 수 없습니다. "Google Flow"는 Google 제품 이름이기도 합니다. 공개용으로는 다른 이름을 권합니다.
-- **실제 생성 검증.** 실제 키로 이미지 1장, 360p 3초 영상 1개, 음악 1개, 내레이션 1개를 만들어 응답 형식을 확인해야 합니다(약 $0.15).
-- **저장소 공개 전환.** 지금은 비공개입니다. 공개로 바꾸면 커밋 기록 전체가 보입니다. API 키가 들어간 커밋은 없습니다(2026-11-13 기록 전체 검사). 다만 이 문서에는 내 PC의 폴더 경로(`C:\Users\crescent\...`)가 적혀 있으니, 공개 전에 4번 항목을 일반 예시로 바꾸세요.
+- **실제 생성 검증.** 실제 키로 이미지 1장, 360p 3초 영상 1개, 음악 1개, 내레이션 1개를 만들어 응답 형식을 확인해야 합니다(약 $0.15). 지금까지의 확인은 모두 데모 모드와 mock입니다.
+- **이름.** PyPI의 `google-flow-mcp`는 원작자 소유라서 같은 이름으로 올릴 수 없습니다. "Google Flow"는 Google 제품 이름이기도 합니다. PyPI에 올리려면 다른 이름이 필요합니다.
 - **가격표.** 2026-11-13 값입니다. 바뀌면 `pricing.py`를 고치거나 `FLOW_PRICES_FILE`을 씁니다. TTS 가격은 2027-01-01에 두 배가 됩니다.

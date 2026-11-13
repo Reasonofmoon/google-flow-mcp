@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import functools
 import mimetypes
 import os
 import re
@@ -21,9 +22,11 @@ from google import genai
 try:  # mcp >= 2
     from mcp.server.mcpserver import Image as _Image
     from mcp.server.mcpserver import MCPServer as _Server
+    from mcp.server.mcpserver.exceptions import ToolError
 except ImportError:  # mcp 1.x
     from mcp.server.fastmcp import FastMCP as _Server
     from mcp.server.fastmcp import Image as _Image
+    from mcp.server.fastmcp.exceptions import ToolError
 
 from . import __version__, config, ledger, media, presets, pricing, project
 
@@ -58,7 +61,43 @@ if config.demo():
 
     INSTRUCTIONS += "\n" + _DEMO_NOTICE + " Tell the user results are placeholders."
 
-mcp = _Server("google-flow-mcp", instructions=INSTRUCTIONS)
+try:  # mcp 2.x reports a server version to the client
+    mcp = _Server("google-flow-mcp", instructions=INSTRUCTIONS, version=__version__)
+except Exception:  # mcp 1.x has no version argument
+    mcp = _Server("google-flow-mcp", instructions=INSTRUCTIONS)
+
+
+def _explain(exc: Exception) -> str:
+    """The message a user (or the assistant) needs in order to fix the problem."""
+    text = str(exc).strip() or type(exc).__name__
+    if not isinstance(exc, (ValueError, RuntimeError, OSError, TimeoutError)):
+        text = f"{type(exc).__name__}: {text}"
+    return text[:1500]
+
+
+def tool() -> Callable:
+    """Register an MCP tool whose failures reach the client as readable messages.
+
+    mcp 2.x hides the message of every exception that is not a ToolError ("Error executing
+    tool X" and nothing else), which would swallow 'GOOGLE_API_KEY is not set', quotes,
+    limits and 'shot not found'. The registered wrapper converts them; the plain function
+    is returned unchanged, so Python callers and tests still see the original exception.
+    """
+
+    def register(fn: Callable) -> Callable:
+        @functools.wraps(fn)
+        async def guarded(*args: Any, **kwargs: Any) -> Any:
+            try:
+                return await fn(*args, **kwargs)
+            except ToolError:
+                raise
+            except Exception as exc:
+                raise ToolError(_explain(exc)) from exc
+
+        mcp.tool(structured_output=False)(guarded)
+        return fn
+
+    return register
 
 # ── Client ────────────────────────────────────────────────────────────────────
 
@@ -281,6 +320,19 @@ def _video_format(duration: int, aspect: str, resolution: str) -> dict:
     return fmt
 
 
+async def clip_aspect(path: Optional[str]) -> Optional[str]:
+    """'9:16' or '16:9' for a local clip, or None when it cannot be read."""
+    if not path or not media.ffmpeg_exe():
+        return None
+    try:
+        info = await media.probe(Path(path).expanduser())
+    except Exception:
+        return None
+    if not info["width"] or not info["height"]:
+        return None
+    return "9:16" if info["height"] > info["width"] else "16:9"
+
+
 def _check_video_args(aspect: str, resolution: str) -> None:
     if aspect not in VIDEO_ASPECTS:
         raise ValueError(f"Video aspect_ratio must be one of {VIDEO_ASPECTS}; got {aspect}.")
@@ -330,7 +382,7 @@ def _video_result(paths: list[str], extra: dict, est: float | None) -> str:
 # ── Tool 1: Text → Image ─────────────────────────────────────────────────────
 
 
-@mcp.tool(structured_output=False)
+@tool()
 async def flow_generate_image(
     prompt: str,
     model: Optional[str] = None,
@@ -394,7 +446,7 @@ _EDIT_HINTS = {
 }
 
 
-@mcp.tool(structured_output=False)
+@tool()
 async def flow_edit_image(
     image_path: str,
     prompt: str,
@@ -440,7 +492,7 @@ async def flow_edit_image(
 # ── Tool 3: Generate with Reference Images ────────────────────────────────────
 
 
-@mcp.tool(structured_output=False)
+@tool()
 async def flow_generate_image_with_references(
     prompt: str,
     reference_image_paths: list[str],
@@ -499,7 +551,7 @@ async def flow_generate_image_with_references(
 # ── Tool 4: Text → Video ─────────────────────────────────────────────────────
 
 
-@mcp.tool(structured_output=False)
+@tool()
 async def flow_generate_video(
     prompt: str,
     duration_seconds: int = 8,
@@ -577,7 +629,7 @@ async def flow_generate_video(
 # ── Tool 5: Extend / edit a video ─────────────────────────────────────────────
 
 
-@mcp.tool(structured_output=False)
+@tool()
 async def flow_extend_video(
     prompt: str,
     video_path: Optional[str] = None,
@@ -606,10 +658,14 @@ async def flow_extend_video(
         reference_image_paths: Images of new characters/objects to bring in.
         confirm_cost: Set true only after the user accepted the cost estimate.
         output_dir: Override the output folder.
-        aspect_ratio: Ignored (the source clip decides). Kept for compatibility with 0.1.0.
+        aspect_ratio: '16:9' or '9:16'. Usually not needed: a local clip's shape is detected.
+                      Pass it if a vertical clip comes back landscape.
     """
     if not video_path and not previous_interaction_id:
         raise ValueError("Provide previous_interaction_id (preferred) or video_path.")
+    if aspect_ratio and aspect_ratio not in VIDEO_ASPECTS:
+        raise ValueError(f"aspect_ratio must be one of {VIDEO_ASPECTS}; got {aspect_ratio}.")
+    aspect = aspect_ratio or (await clip_aspect(video_path) if video_path else None)
     if resolution not in VIDEO_RESOLUTIONS:
         raise ValueError(f"resolution must be one of {VIDEO_RESOLUTIONS}; got {resolution}.")
     duration = max(3, min(10, duration_seconds))
@@ -623,6 +679,8 @@ async def flow_extend_video(
 
     async def work() -> tuple[list[str], dict]:
         response_format = {"type": "video", "duration": f"{duration}s", "resolution": resolution}
+        if aspect:
+            response_format["aspect_ratio"] = aspect
         if resolution in ("1080p", "4k"):
             response_format["delivery"] = "uri"
         if previous_interaction_id:
@@ -648,7 +706,7 @@ async def flow_extend_video(
 # ── Tool 6: Image → Video Pipeline ───────────────────────────────────────────
 
 
-@mcp.tool(structured_output=False)
+@tool()
 async def flow_image_to_video(
     video_prompt: str,
     image_prompt: Optional[str] = None,
@@ -729,7 +787,7 @@ async def flow_image_to_video(
 # ── Tool 7-9: Presets, cost, usage ───────────────────────────────────────────
 
 
-@mcp.tool(structured_output=False)
+@tool()
 async def flow_list_presets() -> str:
     """List format presets, style presets, current models and limits."""
     lines = ["Format presets (preset=):"]
@@ -759,7 +817,7 @@ async def flow_list_presets() -> str:
     return "\n".join(lines) + demo_note()
 
 
-@mcp.tool(structured_output=False)
+@tool()
 async def flow_estimate_cost(
     kind: str = "video",
     model: Optional[str] = None,
@@ -799,7 +857,7 @@ def _limits_text() -> str:
             f"ask before videos over ${config.video_confirm_usd():.2f}")
 
 
-@mcp.tool(structured_output=False)
+@tool()
 async def flow_usage_today() -> str:
     """Show today's generation count and estimated spend from the local log."""
     u = ledger.usage_today()

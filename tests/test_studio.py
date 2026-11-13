@@ -223,6 +223,7 @@ async def test_full_film_pipeline(studio_client, tmp_path):
     edit_call = _calls(studio_client, "omni")[-1]
     assert edit_call["previous_interaction_id"].startswith("v1_")
     assert edit_call["input"].endswith("Keep everything else the same.")
+    assert edit_call["response_format"]["aspect_ratio"] == "16:9"  # the project's shape is kept
 
     music = await flow_generate_music(prompt="warm lo-fi piano")
     assert "Attached to project" in music
