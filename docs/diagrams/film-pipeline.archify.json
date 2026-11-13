@@ -1,0 +1,52 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "From one sentence to a finished film",
+    "output": ".archify/workflow-film-pipeline-20261113-0935/film-pipeline.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "you", "label": "You" },
+    { "id": "assistant", "label": "Assistant + MCP tools" },
+    { "id": "paid", "label": "Gemini API (paid)" },
+    { "id": "local", "label": "Your computer (free)" }
+  ],
+  "phases": [
+    { "id": "plan-phase", "label": "Plan", "fromCol": 0, "toCol": 1 },
+    { "id": "look-phase", "label": "Fix the look", "fromCol": 2, "toCol": 2, "variant": "emphasis" },
+    { "id": "motion-phase", "label": "Add motion", "fromCol": 3, "toCol": 4 },
+    { "id": "finish-phase", "label": "Finish", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["idea", "plan", "keyframes", "approve", "draft", "review", "final", "assemble", "watch"],
+  "nodes": [
+    { "id": "idea", "lane": "you", "col": 0, "type": "external", "label": "Idea", "sublabel": "one sentence" },
+    { "id": "approve", "lane": "you", "col": 2, "type": "security", "label": "Approve the look", "sublabel": "contact sheet" },
+    { "id": "watch", "lane": "you", "col": 5, "type": "frontend", "label": "Watch", "sublabel": "film + board.html" },
+    { "id": "plan", "lane": "assistant", "col": 1, "type": "backend", "label": "Plan", "sublabel": "ingredients + shot list", "tag": "@name tags" },
+    { "id": "review", "lane": "assistant", "col": 3, "type": "backend", "label": "Review frames", "sublabel": "flow_review", "tag": "redo weak shots" },
+    { "id": "keyframes", "lane": "paid", "col": 2, "type": "cloud", "label": "Keyframes", "sublabel": "1 still per shot", "tag": "~$0.03 each" },
+    { "id": "draft", "lane": "paid", "col": 3, "type": "cloud", "label": "Draft render", "sublabel": "360p, background", "tag": "~$0.023 / s" },
+    { "id": "final", "lane": "paid", "col": 4, "type": "cloud", "label": "Final render", "sublabel": "720p, good shots only", "tag": "~$0.07 / s" },
+    { "id": "audio", "lane": "paid", "col": 5, "type": "cloud", "label": "Music + voice", "sublabel": "Lyria, Gemini TTS" },
+    { "id": "store", "lane": "local", "col": 1, "type": "database", "label": "Project folder", "sublabel": "project.json" },
+    { "id": "assemble", "lane": "local", "col": 5, "type": "backend", "label": "Assemble", "sublabel": "join, trim, mix", "tag": "ffmpeg" }
+  ],
+  "edges": [
+    { "id": "idea-plan", "from": "idea", "to": "plan", "variant": "emphasis", "fromSide": "right", "toSide": "top" },
+    { "id": "plan-keyframes", "from": "plan", "to": "keyframes", "label": "shot list" },
+    { "id": "keyframes-approve", "from": "keyframes", "to": "approve", "label": "preview" },
+    { "id": "approve-draft", "from": "approve", "to": "draft", "label": "looks right", "variant": "security" },
+    { "id": "draft-review", "from": "draft", "to": "review", "label": "frames" },
+    { "id": "review-final", "from": "review", "to": "final", "label": "quote accepted", "variant": "security" },
+    { "id": "final-assemble", "from": "final", "to": "assemble", "label": "takes", "variant": "emphasis" },
+    { "id": "audio-assemble", "from": "audio", "to": "assemble", "label": "tracks", "variant": "dashed", "role": "async" },
+    { "id": "assemble-watch", "from": "assemble", "to": "watch", "variant": "emphasis", "fromSide": "right", "toSide": "right", "route": "outside-right" },
+    { "id": "plan-store", "from": "plan", "to": "store", "label": "saved", "variant": "dashed", "role": "branch" }
+  ],
+  "cards": [
+    { "dot": "amber", "title": "Look before you spend", "items": ["Keyframes settle the look for cents", "360p drafts cost about a third of 720p"] },
+    { "dot": "rose", "title": "You approve the money", "items": ["Jobs above the threshold return a quote", "A daily budget stops runaway loops"] },
+    { "dot": "emerald", "title": "Free on your computer", "items": ["ffmpeg joins, trims and mixes locally", "Everything is kept in one project folder"] }
+  ]
+}

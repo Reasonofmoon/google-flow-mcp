@@ -1,6 +1,8 @@
+<p align="center"><img src="docs/assets/hero.svg" width="100%" alt="google-flow-mcp"></p>
+
 # 이 저장소 사용·관리 안내 (한국어)
 
-`google-flow-mcp`를 고쳐 만든 Reasonofmoon 포크입니다. 지금 버전은 0.3.0입니다.
+`google-flow-mcp`를 고쳐 만든 Reasonofmoon 포크입니다. 지금 버전은 0.3.1입니다.
 Google Flow 웹앱을 조종하는 도구가 아닙니다. Flow에서 하던 작업 방식을 Gemini API로 다시 만든 것이고, 요금은 내 Gemini API 키로 Google에 직접 냅니다.
 
 ## 1. 무엇을 할 수 있나
@@ -16,6 +18,10 @@ Google Flow 웹앱을 조종하는 도구가 아닙니다. Flow에서 하던 작
 | 결과를 Claude가 직접 보고 점검 | `flow_review` |
 
 ## 2. 여러 샷 영상 만드는 순서
+
+<p align="center"><img src="docs/assets/workflow.svg" width="760" alt="아이디어에서 완성 영상까지의 흐름"></p>
+
+위 그림을 도구 이름으로 풀면 아래와 같습니다.
 
 ```
 flow_project            프로젝트 만들기 (16:9 또는 9:16, 전체 스타일 한 줄)

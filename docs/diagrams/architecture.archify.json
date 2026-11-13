@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "google-flow-mcp: how a request travels",
+    "output": ".archify/architecture-flow-mcp-20261113-0935/flow-mcp-architecture.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "you", "type": "external", "label": "You", "sublabel": "plain-language idea", "pos": [40, 195], "size": [130, 64] },
+    { "id": "client", "type": "frontend", "label": "MCP client", "sublabel": "Claude Desktop & others", "pos": [220, 195], "size": [150, 64] },
+    { "id": "server", "type": "backend", "label": "google-flow-mcp", "sublabel": "21 tools · 3 prompts", "tag": "local · stdio", "pos": [500, 180], "size": [180, 94] },
+    { "id": "guard", "type": "security", "label": "Spend guard", "sublabel": "quote · confirm · budget", "tag": "asks before paying", "pos": [790, 187], "size": [150, 80] },
+    { "id": "banana", "type": "cloud", "label": "Nano Banana", "sublabel": "images · edits · 4K", "pos": [1040, 40], "size": [170, 60] },
+    { "id": "omni", "type": "cloud", "label": "Gemini Omni Flash", "sublabel": "video · edit · extend", "pos": [1040, 145], "size": [170, 60] },
+    { "id": "lyria", "type": "cloud", "label": "Lyria", "sublabel": "30 s clip · full song", "pos": [1040, 250], "size": [170, 60] },
+    { "id": "tts", "type": "cloud", "label": "Gemini TTS", "sublabel": "narration · 130+ langs", "pos": [1040, 355], "size": [170, 60] },
+    { "id": "board", "type": "frontend", "label": "Board + film", "sublabel": "board.html · film.mp4", "pos": [40, 400], "size": [130, 64] },
+    { "id": "store", "type": "database", "label": "Project folder", "sublabel": "plan · takes · audio", "pos": [265, 400], "size": [150, 64] },
+    { "id": "ffmpeg", "type": "backend", "label": "ffmpeg", "sublabel": "frames · concat · mix", "tag": "bundled", "pos": [515, 400], "size": [150, 64] },
+    { "id": "log", "type": "database", "label": "Generation log", "sublabel": "generation_log.jsonl", "pos": [760, 400], "size": [160, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Gemini API · billed to your own key", "wraps": ["banana", "omni", "lyria", "tts"] }
+  ],
+  "connections": [
+    { "id": "you-asks", "from": "you", "to": "client", "label": "asks", "variant": "emphasis" },
+    { "id": "tool-call", "from": "client", "to": "server", "label": "MCP tool call", "variant": "emphasis" },
+    { "id": "tool-result", "from": "server", "to": "client", "label": "text + previews", "variant": "dashed" },
+    { "id": "estimate", "from": "server", "to": "guard", "label": "estimate", "variant": "security" },
+    { "id": "guard-banana", "from": "guard", "to": "banana", "fromSide": "right", "toSide": "left" },
+    { "id": "guard-omni", "from": "guard", "to": "omni", "fromSide": "right", "toSide": "left" },
+    { "id": "guard-lyria", "from": "guard", "to": "lyria", "fromSide": "right", "toSide": "left" },
+    { "id": "guard-tts", "from": "guard", "to": "tts", "fromSide": "right", "toSide": "left" },
+    { "id": "save-media", "from": "server", "to": "store", "label": "saves plan + media", "fromSide": "bottom", "toSide": "top" },
+    { "id": "run-ffmpeg", "from": "server", "to": "ffmpeg", "label": "runs", "fromSide": "bottom", "toSide": "top" },
+    { "id": "write-log", "from": "server", "to": "log", "label": "one line per call", "variant": "dashed", "fromSide": "bottom", "toSide": "top" },
+    { "id": "film-out", "from": "ffmpeg", "to": "store", "label": "film.mp4" },
+    { "id": "board-out", "from": "store", "to": "board", "label": "board.html" },
+    { "id": "open-board", "from": "board", "to": "you", "label": "open", "variant": "dashed", "fromSide": "top", "toSide": "bottom" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Runs on your machine", "items": ["The server is a local stdio process", "Plans and media stay in one project folder", "Only generation requests go to Google"] },
+    { "dot": "rose", "title": "Spend is guarded", "items": ["Jobs above a threshold return a quote first", "Daily count and budget limits from the local log"] },
+    { "dot": "emerald", "title": "The assistant can see results", "items": ["Image tools return a preview", "flow_review returns video frames", "FLOW_DEMO=1 swaps the API for local placeholders"] }
+  ]
+}

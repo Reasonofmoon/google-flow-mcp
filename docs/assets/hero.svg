@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" width="1280" height="420" role="img" aria-labelledby="t d">
+  <title id="t">google-flow-mcp</title>
+  <desc id="d">A Flow-style film studio inside your AI assistant: four storyboard frames play in sequence and become one film.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0f1f"/>
+      <stop offset="1" stop-color="#171d3a"/>
+    </linearGradient>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.07"/>
+    </pattern>
+    <linearGradient id="s1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f7f6b"/><stop offset="1" stop-color="#d9a36a"/></linearGradient>
+    <linearGradient id="s2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a56a8"/><stop offset="1" stop-color="#e08f8f"/></linearGradient>
+    <linearGradient id="s3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c2f6e"/><stop offset="1" stop-color="#8a6fd1"/></linearGradient>
+    <linearGradient id="s4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16203f"/><stop offset="1" stop-color="#3f6fb5"/></linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5eead4"/><stop offset="1" stop-color="#8ea8ff"/></linearGradient>
+    <clipPath id="frame"><rect width="150" height="86" rx="10"/></clipPath>
+    <clipPath id="card"><rect width="1280" height="420" rx="22"/></clipPath>
+  </defs>
+  <style>
+    text { font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
+    .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+    .glow { fill: none; stroke: url(#accent); stroke-width: 3; opacity: 0; animation: lit 8s linear infinite; }
+    .g2 { animation-delay: 2s; } .g3 { animation-delay: 4s; } .g4 { animation-delay: 6s; }
+    .head { animation: sweep 8s linear infinite; }
+    .pulse { transform-origin: 1198px 329px; animation: pulse 2s ease-in-out infinite; }
+    @keyframes lit { 0%, 24% { opacity: 1; } 25%, 100% { opacity: 0; } }
+    @keyframes sweep { from { transform: translateX(0); } to { transform: translateX(486px); } }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+    @media (prefers-reduced-motion: reduce) { .glow, .head, .pulse { animation: none; } .glow { opacity: 0; } }
+  </style>
+
+  <g clip-path="url(#card)">
+    <rect width="1280" height="420" fill="url(#bg)"/>
+    <rect width="1280" height="420" fill="url(#dots)"/>
+    <circle cx="1120" cy="60" r="220" fill="#6d7cff" opacity="0.10"/>
+    <circle cx="150" cy="430" r="200" fill="#5eead4" opacity="0.07"/>
+  </g>
+  <rect x="0.5" y="0.5" width="1279" height="419" rx="22" fill="none" stroke="#ffffff" stroke-opacity="0.10"/>
+
+  <!-- left: name and promise -->
+  <rect x="64" y="62" width="258" height="28" rx="14" fill="#ffffff" fill-opacity="0.07" stroke="#ffffff" stroke-opacity="0.14"/>
+  <circle cx="82" cy="76" r="4" fill="#5eead4"/>
+  <text x="94" y="81" class="mono" font-size="12.5" fill="#c7d2fe" letter-spacing="1.2">MCP SERVER · GEMINI API</text>
+  <text x="62" y="150" font-size="56" font-weight="800" fill="#ffffff" letter-spacing="-1.5">google-flow-mcp</text>
+  <text x="64" y="194" font-size="23" font-weight="600" fill="url(#accent)">A Flow-style film studio inside your AI assistant</text>
+  <text x="64" y="232" font-size="17" fill="#aab4d4">Plan shots, keep characters consistent, render, edit,</text>
+  <text x="64" y="256" font-size="17" fill="#aab4d4">add music and a voice-over, then cut the film together.</text>
+
+  <g class="mono" font-size="12.5" fill="#dbe4ff">
+    <rect x="64" y="296" width="86" height="30" rx="8" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.14"/><text x="79" y="316">21 tools</text>
+    <rect x="160" y="296" width="110" height="30" rx="8" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.14"/><text x="175" y="316">@ingredients</text>
+    <rect x="280" y="296" width="126" height="30" rx="8" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.14"/><text x="295" y="316">keyframe-first</text>
+    <rect x="416" y="296" width="110" height="30" rx="8" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.14"/><text x="431" y="316">spend guard</text>
+    <rect x="64" y="336" width="150" height="30" rx="8" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.14"/><text x="79" y="356">sees its own work</text>
+    <rect x="224" y="336" width="118" height="30" rx="8" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.14"/><text x="239" y="356">music + voice</text>
+    <rect x="352" y="336" width="174" height="30" rx="8" fill="#5eead4" fill-opacity="0.12" stroke="#5eead4" stroke-opacity="0.45"/><text x="367" y="356" fill="#99f6e4">free demo, no API key</text>
+  </g>
+
+  <!-- right: storyboard that plays -->
+  <text x="676" y="92" class="mono" font-size="12.5" fill="#8fa0d0" letter-spacing="1.2">STORYBOARD</text>
+  <g transform="translate(676 108)">
+    <g>
+      <g clip-path="url(#frame)"><rect width="150" height="86" fill="url(#s1)"/><circle cx="108" cy="26" r="13" fill="#fff4d6"/><path d="M0 62 L30 50 L62 60 L96 46 L150 58 V86 H0Z" fill="#1f4a3f"/><path d="M0 74 L44 64 L88 74 L150 66 V86 H0Z" fill="#12302a"/></g>
+      <rect class="glow" width="150" height="86" rx="10"/>
+      <text x="10" y="20" class="mono" font-size="11" font-weight="700" fill="#ffffff">S1</text>
+    </g>
+    <g transform="translate(166 0)">
+      <g clip-path="url(#frame)"><rect width="150" height="86" fill="url(#s2)"/><circle cx="44" cy="30" r="12" fill="#fff4d6"/><path d="M0 58 L40 48 L84 60 L118 50 L150 56 V86 H0Z" fill="#283a78"/><path d="M0 72 L52 66 L100 76 L150 64 V86 H0Z" fill="#18244f"/></g>
+      <rect class="glow g2" width="150" height="86" rx="10"/>
+      <text x="10" y="20" class="mono" font-size="11" font-weight="700" fill="#ffffff">S2</text>
+    </g>
+    <g transform="translate(332 0)">
+      <g clip-path="url(#frame)"><rect width="150" height="86" fill="url(#s3)"/><circle cx="100" cy="30" r="17" fill="#fff4d6"/><path d="M0 64 L36 56 L70 62 L110 52 L150 60 V86 H0Z" fill="#232458"/><path d="M0 76 L60 68 L104 76 L150 70 V86 H0Z" fill="#15163a"/></g>
+      <rect class="glow g3" width="150" height="86" rx="10"/>
+      <text x="10" y="20" class="mono" font-size="11" font-weight="700" fill="#ffffff">S3</text>
+    </g>
+    <g transform="translate(0 102)">
+      <g clip-path="url(#frame)"><rect width="150" height="86" fill="url(#s4)"/><circle cx="112" cy="24" r="15" fill="#fff4d6"/><path d="M26 70 L40 34 L54 70Z" fill="#e8ecff"/><path d="M40 34 L40 22" stroke="#99f6e4" stroke-width="3" stroke-linecap="round"/><path d="M0 68 L50 62 L96 70 L150 62 V86 H0Z" fill="#101a35"/></g>
+      <rect class="glow g4" width="150" height="86" rx="10"/>
+      <text x="10" y="20" class="mono" font-size="11" font-weight="700" fill="#ffffff">S4</text>
+    </g>
+    <!-- ingredient + notes beside the last frame -->
+    <g transform="translate(166 102)" class="mono" font-size="12">
+      <rect width="316" height="86" rx="10" fill="#ffffff" fill-opacity="0.05" stroke="#ffffff" stroke-opacity="0.14"/>
+      <circle cx="30" cy="30" r="14" fill="#fde68a"/><circle cx="30" cy="25" r="6" fill="#f8fafc"/><path d="M18 40 Q30 28 42 40" fill="#facc15"/>
+      <text x="56" y="27" fill="#ffffff" font-weight="700">@mira</text>
+      <text x="56" y="45" fill="#aab4d4">silver hair, yellow raincoat</text>
+      <text x="16" y="72" fill="#99f6e4">camera: push-in</text>
+      <text x="150" y="72" fill="#fca5a5">draft 360p ~$0.39</text>
+    </g>
+  </g>
+
+  <!-- timeline that the playhead sweeps -->
+  <g transform="translate(676 324)">
+    <rect width="486" height="10" rx="5" fill="#ffffff" fill-opacity="0.10"/>
+    <rect width="118" height="10" rx="5" fill="#3f7f6b"/><rect x="122" width="118" height="10" rx="5" fill="#3a56a8"/><rect x="244" width="118" height="10" rx="5" fill="#6a56c2"/><rect x="366" width="120" height="10" rx="5" fill="#2f5aa0"/>
+    <g class="head"><rect x="-2" y="-8" width="4" height="26" rx="2" fill="#ffffff"/><circle cx="0" cy="-10" r="5" fill="#ffffff"/></g>
+    <text x="0" y="40" class="mono" font-size="12" fill="#8fa0d0">keyframes → draft → review → final → music + voice → film.mp4</text>
+  </g>
+  <g class="pulse"><circle cx="1198" cy="329" r="19" fill="#5eead4" fill-opacity="0.16" stroke="#5eead4" stroke-opacity="0.6"/><path d="M1192 319 L1208 329 L1192 339Z" fill="#5eead4"/></g>
+</svg>
