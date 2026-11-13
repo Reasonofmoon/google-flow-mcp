@@ -31,7 +31,7 @@ jobs:
         run: uv pip install --system -e ".[dev]" "mcp[cli]${{ matrix.mcp }}"
 
       - name: Show versions
-        run: python -c "import importlib.metadata as m; print('mcp', m.version('mcp'), '| google-genai', m.version('google-genai'))"
+        run: python -c "import importlib.metadata as m; print('mcp', m.version('mcp'), '| google-genai', m.version('google-genai')); from google_flow_mcp import media; print('ffmpeg', media.ffmpeg_exe())"
 
       - name: Run tests
         run: pytest -v --tb=short tests/
@@ -44,5 +44,8 @@ jobs:
           tools = asyncio.run(mcp.list_tools())
           names = sorted(t.name for t in tools)
           print(len(names), names)
-          assert len(names) == 9, names
+          assert len(names) == 21, names
+          prompts = sorted(p.name for p in asyncio.run(mcp.list_prompts()))
+          print(prompts)
+          assert prompts == ['product_ad', 'short_film', 'social_image_set'], prompts
           EOF

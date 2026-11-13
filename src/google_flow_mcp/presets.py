@@ -39,6 +39,36 @@ STYLES: dict[str, str] = {
 }
 
 
+# Camera moves, as in Flow's camera controls. Written the way Omni's prompt guide suggests.
+CAMERA: dict[str, str] = {
+    "static": "locked-off static camera on a tripod, no camera movement",
+    "push-in": "slow dolly push-in toward the subject",
+    "pull-out": "slow dolly pull-back that reveals the surroundings",
+    "pan-left": "smooth pan from right to left",
+    "pan-right": "smooth pan from left to right",
+    "tilt-up": "slow tilt upward",
+    "tilt-down": "slow tilt downward",
+    "orbit": "camera orbits around the subject in a smooth arc",
+    "tracking": "tracking shot that follows the subject at the same speed",
+    "crane-up": "crane shot rising up and away",
+    "drone": "aerial drone shot gliding forward over the scene",
+    "handheld": "handheld camera with slight natural shake, documentary feel",
+    "pov": "first-person point-of-view shot",
+    "dolly-zoom": "dolly zoom (vertigo effect): camera moves back while zooming in",
+    "macro": "extreme close-up macro shot with shallow depth of field",
+    "slow-motion": "slow motion, 120 fps look",
+    "timelapse": "timelapse with fast-moving clouds and light",
+    "whip-pan": "fast whip pan with motion blur",
+}
+
+
+def camera_phrase(name: Optional[str]) -> str:
+    """A preset name becomes its phrase; anything else is used as written."""
+    if not name:
+        return ""
+    return CAMERA.get(name.strip().lower(), name.strip())
+
+
 def _custom() -> dict:
     path = config.presets_file()
     if not path:

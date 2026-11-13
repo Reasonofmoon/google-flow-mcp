@@ -30,6 +30,21 @@ VIDEO_PRICES: dict[str, dict[str, float]] = {
 }
 
 
+# USD per request
+MUSIC_PRICES: dict[str, float] = {
+    "lyria-3-clip-preview": 0.04,
+    "lyria-3.5": 0.08,
+    "lyria-3-pro-preview": 0.08,
+}
+
+# USD per second of speech (free tier available; these are paid-tier rates
+# through 2026-12-31, and they double on 2027-01-01)
+SPEECH_PRICES: dict[str, float] = {
+    "gemini-3.8-flash-tts": 0.000225,
+    "gemini-3.8-flash-lite-tts": 0.00015,
+}
+
+
 def _load_overrides() -> None:
     custom = os.environ.get("FLOW_PRICES_FILE", "").strip()
     if not custom:
@@ -40,6 +55,8 @@ def _load_overrides() -> None:
         return
     IMAGE_PRICES.update(data.get("image", {}))
     VIDEO_PRICES.update(data.get("video", {}))
+    MUSIC_PRICES.update(data.get("music", {}))
+    SPEECH_PRICES.update(data.get("speech", {}))
 
 
 def image_cost(model: str, image_size: str = "1K", count: int = 1) -> float | None:
@@ -60,5 +77,18 @@ def video_cost(model: str, seconds: int, resolution: str = "720p") -> float | No
     return round(price * max(1, seconds), 4)
 
 
+def music_cost(model: str) -> float | None:
+    _load_overrides()
+    return MUSIC_PRICES.get(model)
+
+
+def speech_cost(model: str, seconds: float) -> float | None:
+    _load_overrides()
+    rate = SPEECH_PRICES.get(model)
+    return None if rate is None else round(rate * max(1.0, seconds), 4)
+
+
 def fmt_usd(value: float | None) -> str:
-    return "unknown (model not in price table)" if value is None else f"~${value:.2f}"
+    if value is None:
+        return "unknown (model not in price table)"
+    return f"~${value:.2f}" if value >= 0.01 or value == 0 else f"~${value:.4f}"

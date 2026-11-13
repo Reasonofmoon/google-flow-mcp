@@ -1,23 +1,17 @@
-"""Unit tests for google_flow_mcp — every Google API call is mocked."""
+"""Core generation tools: models, file names, log, presets, video, limits."""
 
 from __future__ import annotations
 
 import base64
 import json
-import os
-import tempfile
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-os.environ.setdefault("GOOGLE_API_KEY", "test-api-key-000")
-os.environ["FLOW_OUTPUT_DIR"] = tempfile.mkdtemp()
-
-import google_flow_mcp.server as server  # noqa: E402
-from google_flow_mcp import config, ledger, presets, pricing  # noqa: E402
-from google_flow_mcp.server import (  # noqa: E402
+import google_flow_mcp.server as server
+from google_flow_mcp import config, ledger, presets, pricing
+from google_flow_mcp.server import (
     flow_edit_image,
     flow_estimate_cost,
     flow_extend_video,
@@ -29,40 +23,7 @@ from google_flow_mcp.server import (  # noqa: E402
     flow_usage_today,
 )
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
-MP4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 32
-
-
-def _interaction(kind: str, data: bytes, iid: str = "v1_test", mime: str | None = None):
-    item = SimpleNamespace(type=kind, data=base64.b64encode(data).decode(), uri=None,
-                           mime_type=mime or ("image/png" if kind == "image" else "video/mp4"))
-    return SimpleNamespace(
-        id=iid, status="completed", output_text="",
-        steps=[SimpleNamespace(type="user_input", content=[]),
-               SimpleNamespace(type="model_output", content=[item])],
-    )
-
-
-@pytest.fixture(autouse=True)
-def isolate(tmp_path, monkeypatch):
-    server._client = None
-    for k in list(os.environ):
-        if k.startswith("FLOW_") and k != "FLOW_OUTPUT_DIR":
-            monkeypatch.delenv(k, raising=False)
-    monkeypatch.setenv("FLOW_OUTPUT_DIR", str(tmp_path))
-    yield
-    server._client = None
-
-
-@pytest.fixture
-def client(mocker):
-    c = MagicMock()
-    c.aio.interactions.create = AsyncMock(return_value=_interaction("image", PNG))
-    c.aio.files.upload = AsyncMock(return_value=SimpleNamespace(name="files/abc", uri="https://x/files/abc", state="ACTIVE"))
-    c.aio.files.get = AsyncMock(return_value=SimpleNamespace(name="files/abc", state="ACTIVE"))
-    c.aio.files.download = AsyncMock(return_value=MP4)
-    mocker.patch.object(server, "_get_client", return_value=c)
-    return c
+from .conftest import FAKE_MP4, PNG, interaction, text_of, write_png
 
 
 def _log(tmp_path: Path) -> list[dict]:
@@ -70,16 +31,10 @@ def _log(tmp_path: Path) -> list[dict]:
     return [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines()] if p.exists() else []
 
 
-def _png(tmp_path: Path, name: str = "in.png") -> str:
-    p = tmp_path / name
-    p.write_bytes(PNG)
-    return str(p)
-
-
 # ── Models from env ──────────────────────────────────────────────────────────
 
 
-async def test_default_image_model_is_fast(client, tmp_path):
+async def test_default_image_model_is_fast(client):
     await flow_generate_image(prompt="a red apple")
     kw = client.aio.interactions.create.call_args.kwargs
     assert kw["model"] == config.DEFAULT_MODEL_IMAGE_FAST
@@ -99,12 +54,12 @@ async def test_model_aliases_and_env_override(client, monkeypatch):
 
 async def test_video_model_env_override(client, monkeypatch):
     monkeypatch.setenv("FLOW_MODEL_VIDEO", "gemini-omni-9-flash")
-    client.aio.interactions.create.return_value = _interaction("video", MP4)
+    client.aio.interactions.create.return_value = interaction("video", FAKE_MP4)
     await flow_generate_video(prompt="waves", duration_seconds=3, resolution="360p")
     assert client.aio.interactions.create.call_args.kwargs["model"] == "gemini-omni-9-flash"
 
 
-# ── File names + JSONL log ───────────────────────────────────────────────────
+# ── File names, log, previews ────────────────────────────────────────────────
 
 
 def test_slug_keeps_korean_and_strips_symbols():
@@ -114,15 +69,20 @@ def test_slug_keeps_korean_and_strips_symbols():
     assert len(ledger.slug("word " * 50)) <= 40
 
 
-async def test_filename_contains_prompt_and_log_written(client, tmp_path):
+async def test_filename_log_and_inline_preview(client, tmp_path):
     result = await flow_generate_image(prompt="Neon Tokyo alley", number_of_images=2)
     files = sorted(tmp_path.glob("*_image_neon-tokyo-alley_*.png"))
     assert len(files) == 2 and files[0].read_bytes() == PNG
-    assert "2 image(s)" in result
+    assert isinstance(result, list) and len(result) == 2  # text + one contact sheet
+    assert "2 image(s)" in text_of(result)
     rows = _log(tmp_path)
     assert rows[-1]["status"] == "ok" and rows[-1]["count"] == 2
-    assert rows[-1]["prompt"] == "Neon Tokyo alley"
     assert rows[-1]["est_cost_usd"] == pytest.approx(0.0672)
+
+
+async def test_preview_can_be_turned_off(client, monkeypatch):
+    monkeypatch.setenv("FLOW_INLINE_PREVIEW", "0")
+    assert isinstance(await flow_generate_image(prompt="plain"), str)
 
 
 async def test_error_is_logged_and_raised(client, tmp_path):
@@ -162,27 +122,28 @@ async def test_custom_presets_file(client, tmp_path, monkeypatch):
     await flow_generate_image(prompt="book", preset="tpt-cover", style="moon")
     kw = client.aio.interactions.create.call_args.kwargs
     assert kw["response_format"]["image_size"] == "4K" and "pastel moonlight" in kw["input"]
-    assert "tpt-cover" in await flow_list_presets()
+    listing = await flow_list_presets()
+    assert "tpt-cover" in listing and "push-in" in listing and "ffmpeg: found" in listing
 
 
 # ── Edit + references ────────────────────────────────────────────────────────
 
 
 async def test_edit_sends_text_and_image(client, tmp_path):
-    src = _png(tmp_path)
+    src = write_png(tmp_path)
     result = await flow_edit_image(image_path=src, prompt="a forest", edit_mode="bgswap",
                                    mask_mode="MASK_MODE_BACKGROUND")
     inp = client.aio.interactions.create.call_args.kwargs["input"]
     assert inp[0]["type"] == "text" and "background" in inp[0]["text"]
-    assert inp[1]["type"] == "image" and base64.b64decode(inp[1]["data"]) == PNG
-    assert "_edit_" in result
+    assert inp[1]["type"] == "image" and base64.b64decode(inp[1]["data"]) == Path(src).read_bytes()
+    assert "_edit_" in text_of(result)
 
 
 async def test_references_limits(client, tmp_path):
-    paths = [_png(tmp_path, f"r{i}.png") for i in range(3)]
+    paths = [write_png(tmp_path, f"r{i}.png") for i in range(3)]
     result = await flow_generate_image_with_references(prompt="group", reference_image_paths=paths)
     assert len(client.aio.interactions.create.call_args.kwargs["input"]) == 4
-    assert "3 reference(s)" in result
+    assert "3 reference(s)" in text_of(result)
     with pytest.raises(ValueError, match="14"):
         await flow_generate_image_with_references(prompt="x", reference_image_paths=paths * 5)
 
@@ -190,13 +151,14 @@ async def test_references_limits(client, tmp_path):
 # ── Video ────────────────────────────────────────────────────────────────────
 
 
-async def test_video_request_shape(client, tmp_path):
-    client.aio.interactions.create.return_value = _interaction("video", MP4, iid="v1_abc")
+async def test_video_request_shape_and_camera(client, tmp_path):
+    client.aio.interactions.create.return_value = interaction("video", FAKE_MP4, iid="v1_abc")
     result = await flow_generate_video(prompt="drone shot", duration_seconds=99, preset="shorts",
-                                       confirm_cost=True)
+                                       camera="orbit", confirm_cost=True)
     kw = client.aio.interactions.create.call_args.kwargs
     assert kw["response_format"] == {"type": "video", "aspect_ratio": "9:16", "duration": "15s",
                                      "resolution": "720p"}
+    assert presets.CAMERA["orbit"] in kw["input"]
     assert "v1_abc" in result and "SynthID" in result
     assert list(tmp_path.glob("*_video_drone-shot.mp4"))
 
@@ -209,12 +171,11 @@ async def test_video_cost_gate_blocks_until_confirmed(client, tmp_path):
 
 
 async def test_cheap_video_skips_gate(client):
-    client.aio.interactions.create.return_value = _interaction("video", MP4)
-    result = await flow_generate_video(prompt="sunset", duration_seconds=5)  # ~$0.35
-    assert "Saved video" in result
+    client.aio.interactions.create.return_value = interaction("video", FAKE_MP4)
+    assert "Saved video" in await flow_generate_video(prompt="sunset", duration_seconds=5)  # ~$0.35
 
 
-async def test_hd_video_uses_uri_delivery(client, tmp_path):
+async def test_hd_video_uses_uri_delivery(client):
     item = SimpleNamespace(type="video", data=None, mime_type="video/mp4",
                            uri="https://generativelanguage.googleapis.com/v1beta/files/xyz:download?alt=media")
     client.aio.interactions.create.return_value = SimpleNamespace(
@@ -226,8 +187,8 @@ async def test_hd_video_uses_uri_delivery(client, tmp_path):
 
 
 async def test_video_with_first_and_last_frame(client, tmp_path):
-    client.aio.interactions.create.return_value = _interaction("video", MP4)
-    a, b = _png(tmp_path, "a.png"), _png(tmp_path, "b.png")
+    client.aio.interactions.create.return_value = interaction("video", FAKE_MP4)
+    a, b = write_png(tmp_path, "a.png"), write_png(tmp_path, "b.png")
     await flow_generate_video(prompt="morph", anchor_frame_path=a, last_frame_path=b,
                               duration_seconds=15, confirm_cost=True)
     kw = client.aio.interactions.create.call_args.kwargs
@@ -241,26 +202,24 @@ async def test_bad_video_aspect_raises(client):
 
 
 async def test_extend_with_previous_interaction(client):
-    client.aio.interactions.create.return_value = _interaction("video", MP4)
+    client.aio.interactions.create.return_value = interaction("video", FAKE_MP4)
     await flow_extend_video(prompt="continue", previous_interaction_id="v1_prev", confirm_cost=True)
-    kw = client.aio.interactions.create.call_args.kwargs
-    assert kw["previous_interaction_id"] == "v1_prev"
+    assert client.aio.interactions.create.call_args.kwargs["previous_interaction_id"] == "v1_prev"
     client.aio.files.upload.assert_not_called()
 
 
 async def test_extend_uploads_local_video(client, tmp_path):
-    client.aio.interactions.create.return_value = _interaction("video", MP4)
+    client.aio.interactions.create.return_value = interaction("video", FAKE_MP4)
     vid = tmp_path / "clip.mp4"
-    vid.write_bytes(MP4)
-    await flow_extend_video(prompt="continue", video_path=str(vid), duration_seconds=20,
-                            confirm_cost=True)
+    vid.write_bytes(FAKE_MP4)
+    await flow_extend_video(prompt="continue", video_path=str(vid), duration_seconds=20, confirm_cost=True)
     kw = client.aio.interactions.create.call_args.kwargs
     assert kw["input"][0] == {"type": "video", "uri": "https://x/files/abc"}
     assert kw["response_format"]["duration"] == "10s"
 
 
 async def test_image_to_video_pipeline(client, tmp_path):
-    client.aio.interactions.create.side_effect = [_interaction("image", PNG), _interaction("video", MP4)]
+    client.aio.interactions.create.side_effect = [interaction("image", PNG), interaction("video", FAKE_MP4)]
     result = await flow_image_to_video(video_prompt="comes alive", image_prompt="lake at dawn",
                                        duration_seconds=4)
     assert client.aio.interactions.create.await_count == 2
@@ -280,13 +239,14 @@ async def test_daily_image_limit(client, monkeypatch):
 
 async def test_daily_video_limit(client, monkeypatch):
     monkeypatch.setenv("FLOW_DAILY_VIDEO_LIMIT", "1")
-    client.aio.interactions.create.return_value = _interaction("video", MP4)
+    client.aio.interactions.create.return_value = interaction("video", FAKE_MP4)
     await flow_generate_video(prompt="a", duration_seconds=3)
     with pytest.raises(RuntimeError, match="Daily video limit"):
         await flow_generate_video(prompt="b", duration_seconds=3)
 
 
-async def test_daily_budget(client, monkeypatch):
+async def test_daily_budget_default_and_override(client, monkeypatch):
+    assert config.daily_budget_usd() == 5.0
     monkeypatch.setenv("FLOW_DAILY_BUDGET_USD", "0.10")
     await flow_generate_image(prompt="a", number_of_images=2)  # ~$0.067
     with pytest.raises(RuntimeError, match="Daily budget"):
@@ -297,17 +257,12 @@ async def test_usage_and_estimate(client):
     await flow_generate_image(prompt="a")
     usage = await flow_usage_today()
     assert "1 image(s)" in usage and "generation_log.jsonl" in usage
-    est = await flow_estimate_cost(kind="video", duration_seconds=10, resolution="1080p")
-    assert "$1.04" in est
+    assert "$1.04" in await flow_estimate_cost(kind="video", duration_seconds=10, resolution="1080p")
     assert pricing.image_cost("gemini-3-pro-image", "4K", 2) == pytest.approx(0.48)
+    assert pricing.music_cost("lyria-3-clip-preview") == 0.04
 
 
 def test_placeholder_key_is_rejected(monkeypatch):
     monkeypatch.setenv("GOOGLE_API_KEY", "YOUR_GOOGLE_AI_STUDIO_KEY")
     with pytest.raises(EnvironmentError):
         server._get_client()
-
-
-def test_server_object_registered_tools():
-    assert server.mcp is not None
-    assert presets.resolve_format("shorts")["aspect_ratio"] == "9:16"

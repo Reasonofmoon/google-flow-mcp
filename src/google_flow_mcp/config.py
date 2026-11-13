@@ -15,6 +15,9 @@ DEFAULT_MODEL_IMAGE_PRO = "gemini-3-pro-image"            # Nano Banana Pro
 DEFAULT_MODEL_IMAGE_FAST = "gemini-nano-banana-2.1"       # Nano Banana 2.1
 DEFAULT_MODEL_IMAGE_LITE = "gemini-3.1-flash-lite-image"  # Nano Banana 2 Lite
 DEFAULT_MODEL_VIDEO = "gemini-omni-1.2-flash"             # Veo 3.1 Preview shut down 2026-10-22
+DEFAULT_MODEL_MUSIC_CLIP = "lyria-3-clip-preview"         # 30 s clip
+DEFAULT_MODEL_MUSIC_SONG = "lyria-3.5"                    # full song
+DEFAULT_MODEL_TTS = "gemini-3.8-flash-tts"
 
 IMAGE_MODEL_ALIASES = {
     "pro": "pro",
@@ -62,6 +65,41 @@ def video_model() -> str:
     return _env("FLOW_MODEL_VIDEO", DEFAULT_MODEL_VIDEO)
 
 
+def music_model(kind: str = "clip") -> str:
+    if kind == "song":
+        return _env("FLOW_MODEL_MUSIC_SONG", DEFAULT_MODEL_MUSIC_SONG)
+    return _env("FLOW_MODEL_MUSIC_CLIP", DEFAULT_MODEL_MUSIC_CLIP)
+
+
+def tts_model() -> str:
+    return _env("FLOW_MODEL_TTS", DEFAULT_MODEL_TTS)
+
+
+def projects_dir() -> Path:
+    custom = os.environ.get("FLOW_PROJECTS_DIR", "").strip()
+    path = Path(custom).expanduser() if custom else output_dir() / "projects"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def inline_preview() -> bool:
+    """Return small previews to the assistant so it can see what was made."""
+    return _env("FLOW_INLINE_PREVIEW", "1").lower() not in ("0", "false", "no", "off")
+
+
+def ffmpeg_path() -> str:
+    return os.environ.get("FLOW_FFMPEG", "").strip()
+
+
+def render_wait_seconds() -> int:
+    """How long a storyboard render call waits before handing work to the background."""
+    return _env_int("FLOW_RENDER_WAIT_SECONDS", 150)
+
+
+def render_concurrency() -> int:
+    return max(1, _env_int("FLOW_RENDER_CONCURRENCY", 2))
+
+
 def output_dir(override: str | None = None) -> Path:
     base = override or _env("FLOW_OUTPUT_DIR", str(Path.home() / "google_flow_outputs"))
     path = Path(base).expanduser()
@@ -80,17 +118,17 @@ def log_path() -> Path:
 
 def daily_image_limit() -> int:
     """Max images per local day. 0 = no limit."""
-    return _env_int("FLOW_DAILY_IMAGE_LIMIT", 50)
+    return _env_int("FLOW_DAILY_IMAGE_LIMIT", 100)
 
 
 def daily_video_limit() -> int:
     """Max video generations per local day. 0 = no limit."""
-    return _env_int("FLOW_DAILY_VIDEO_LIMIT", 5)
+    return _env_int("FLOW_DAILY_VIDEO_LIMIT", 20)
 
 
 def daily_budget_usd() -> float:
     """Max estimated spend per local day in USD. 0 = no limit."""
-    return _env_float("FLOW_DAILY_BUDGET_USD", 0.0)
+    return _env_float("FLOW_DAILY_BUDGET_USD", 5.0)
 
 
 def video_confirm_usd() -> float:

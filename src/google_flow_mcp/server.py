@@ -1,7 +1,8 @@
-"""Google Flow MCP server (Reasonofmoon fork).
+"""Google Flow MCP server (Reasonofmoon fork): core generation tools.
 
 Images: Nano Banana models through the Gemini Interactions API.
 Video:  Gemini Omni Flash (Veo 3.1 Preview was shut down on 2026-10-22).
+Project, storyboard, audio and review tools live in studio.py.
 """
 
 from __future__ import annotations
@@ -13,16 +14,18 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional, Sequence
 
 from google import genai
 
 try:  # mcp >= 2
+    from mcp.server.mcpserver import Image as _Image
     from mcp.server.mcpserver import MCPServer as _Server
 except ImportError:  # mcp 1.x
     from mcp.server.fastmcp import FastMCP as _Server
+    from mcp.server.fastmcp import Image as _Image
 
-from . import __version__, config, ledger, presets, pricing
+from . import __version__, config, ledger, media, presets, pricing, project
 
 FILE_POLL_INTERVAL = 5     # seconds between Files API status checks
 FILE_POLL_TIMEOUT = 600    # 10 minutes
@@ -30,17 +33,24 @@ VIDEO_ASPECTS = ("16:9", "9:16")
 VIDEO_RESOLUTIONS = ("360p", "720p", "1080p", "4k")
 
 INSTRUCTIONS = (
-    f"google-flow-mcp {__version__} (Reasonofmoon fork). "
-    "Image tools use Nano Banana models: model='fast' (Nano Banana 2.1, cheap, default), "
-    "'pro' (Nano Banana Pro, best text rendering and complex layouts) or 'lite'. "
-    "Video tools use Gemini Omni Flash (3-15 s, native audio, 16:9 or 9:16). "
-    "All models need a paid Gemini API key (no free tier). "
-    "Use preset= for common formats (youtube-thumbnail, shorts, pinterest-pin, ...) and "
-    "style= for looks; call flow_list_presets to see them. "
-    "Video calls above the cost threshold return an estimate first: show it to the user and "
-    "only call again with confirm_cost=true if the user agrees. "
-    "Every generation is logged to generation_log.jsonl; daily limits apply "
-    "(see flow_usage_today)."
+    f"google-flow-mcp {__version__}: Flow-style creative studio on the Gemini API "
+    "(not the Flow web app; billing is the user's Gemini API key).\n"
+    "QUICK JOBS: flow_generate_image / flow_edit_image / flow_generate_video. Image models: "
+    "'fast' (Nano Banana 2.1, default), 'pro' (best text and layouts), 'lite'. Video: Gemini Omni "
+    "Flash, 3-15 s with native audio, 16:9 or 9:16. Use preset=, style=, camera= "
+    "(see flow_list_presets).\n"
+    "FILMS (several shots, consistent characters): 1) flow_project 2) flow_ingredient_save for each "
+    "character/object/location, then write @name in prompts 3) flow_storyboard_plan "
+    "4) flow_storyboard_keyframes and LOOK at the returned sheet; fix weak shots with "
+    "flow_shot_update before paying for video 5) flow_storyboard_render quality='draft' (360p, "
+    "about a third of the price), review, then 'standard' for the shots that work "
+    "6) optional flow_generate_music / flow_generate_narration 7) flow_assemble 8) flow_board.\n"
+    "LOOK BEFORE YOU SPEND: tools return small previews; use flow_review on any image or video to "
+    "see frames and judge it honestly before going on.\n"
+    "COST: image, video and music models need a paid key. Calls above the cost threshold return "
+    "an estimate first: show it to the user and only repeat with confirm_cost=true after they "
+    "agree. Daily limits and a daily budget apply (flow_usage_today). Never claim a file was "
+    "made unless the tool returned its path."
 )
 
 mcp = _Server("google-flow-mcp", instructions=INSTRUCTIONS)
@@ -86,7 +96,8 @@ def _decode(data) -> bytes:
     return base64.b64decode(data)
 
 
-_EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "video/mp4": "mp4"}
+_EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "video/mp4": "mp4",
+        "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav", "audio/x-wav": "wav"}
 
 
 def _ext(item, default: str) -> str:
@@ -109,6 +120,32 @@ def _media_items(interaction, kind: str) -> list:
         if single is not None:
             items.append(single)
     return items
+
+
+def _previews(paths: Sequence[str]) -> list[bytes]:
+    """One thumbnail, or a contact sheet for several images. Empty if nothing opens."""
+    if not config.inline_preview():
+        return []
+    valid = [p for p in paths if media.safe_thumbnail(p, 64) is not None]
+    if not valid:
+        return []
+    if len(valid) == 1:
+        return [media.thumbnail_bytes(valid[0])]
+    return [media.contact_sheet([(str(i + 1), p) for i, p in enumerate(valid)], cols=2)]
+
+
+def _reply(text: str, previews: Sequence[bytes] = ()) -> Any:
+    """Text plus inline JPEG previews the assistant can look at."""
+    if not previews or not config.inline_preview():
+        return text
+    return [text, *(_Image(data=b, format="jpeg") for b in previews)]
+
+
+def _active_project() -> Optional[dict]:
+    try:
+        return project.load()
+    except ValueError:
+        return None
 
 
 def _state(obj) -> str:
@@ -264,7 +301,7 @@ def _video_result(paths: list[str], extra: dict, est: float | None) -> str:
 # ── Tool 1: Text → Image ─────────────────────────────────────────────────────
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def flow_generate_image(
     prompt: str,
     model: Optional[str] = None,
@@ -295,18 +332,26 @@ async def flow_generate_image(
     n = max(1, min(4, number_of_images))
     ar = aspect_ratio or fmt.get("aspect_ratio")
     size = image_size or fmt.get("image_size")
-    full = _with_negative(presets.apply_style(prompt, style), negative_prompt)
+    full, refs, used = project.expand(_active_project(), presets.apply_style(prompt, style),
+                                      max_images=14, per_ingredient=3)
+    full = _with_negative(full, negative_prompt)
+    input_ = full if not refs else [{"type": "text", "text": full}, *(_image_part(r) for r in refs)]
     out = config.output_dir(output_dir)
     est = pricing.image_cost(model_id, size or "1K", n)
 
     paths, _ = await _tracked(
         tool="flow_generate_image", kind="image", count=n, model=model_id, prompt=prompt,
-        params={"aspect_ratio": ar, "image_size": size, "preset": preset, "style": style},
+        params={"aspect_ratio": ar, "image_size": size, "preset": preset, "style": style,
+                "ingredients": used},
         est_cost=est,
-        work=lambda: _images(model=model_id, input_=full, n=n, aspect_ratio=ar, image_size=size,
+        work=lambda: _images(model=model_id, input_=input_, n=n, aspect_ratio=ar, image_size=size,
                              out=out, kind="image", prompt=prompt),
     )
-    return f"Generated {len(paths)} image(s) with {model_id} ({pricing.fmt_usd(est)}):\n" + "\n".join(paths)
+    note = f" using ingredients {', '.join('@' + u for u in used)}" if used else ""
+    return _reply(
+        f"Generated {len(paths)} image(s) with {model_id}{note} ({pricing.fmt_usd(est)}):\n" + "\n".join(paths),
+        _previews(paths),
+    )
 
 
 # ── Tool 2: Edit Image ────────────────────────────────────────────────────────
@@ -320,7 +365,7 @@ _EDIT_HINTS = {
 }
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def flow_edit_image(
     image_path: str,
     prompt: str,
@@ -360,13 +405,13 @@ async def flow_edit_image(
         work=lambda: _images(model=model_id, input_=input_, n=1, aspect_ratio=aspect_ratio,
                              image_size=image_size, out=out, kind="edit", prompt=prompt),
     )
-    return f"Edited image saved to ({pricing.fmt_usd(est)}):\n{paths[0]}"
+    return _reply(f"Edited image saved to ({pricing.fmt_usd(est)}):\n{paths[0]}", _previews(paths))
 
 
 # ── Tool 3: Generate with Reference Images ────────────────────────────────────
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def flow_generate_image_with_references(
     prompt: str,
     reference_image_paths: list[str],
@@ -415,22 +460,24 @@ async def flow_generate_image_with_references(
         work=lambda: _images(model=model_id, input_=input_, n=n, aspect_ratio=ar, image_size=size,
                              out=out, kind="ref", prompt=prompt),
     )
-    return (
+    return _reply(
         f"Generated {len(paths)} image(s) using {len(reference_image_paths)} reference(s) "
-        f"with {model_id} ({pricing.fmt_usd(est)}):\n" + "\n".join(paths)
+        f"with {model_id} ({pricing.fmt_usd(est)}):\n" + "\n".join(paths),
+        _previews(paths),
     )
 
 
 # ── Tool 4: Text → Video ─────────────────────────────────────────────────────
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def flow_generate_video(
     prompt: str,
     duration_seconds: int = 8,
     aspect_ratio: Optional[str] = None,
     resolution: str = "720p",
     preset: Optional[str] = None,
+    camera: Optional[str] = None,
     negative_prompt: Optional[str] = None,
     anchor_frame_path: Optional[str] = None,
     last_frame_path: Optional[str] = None,
@@ -449,6 +496,8 @@ async def flow_generate_video(
         aspect_ratio: '16:9' or '9:16'. Overrides preset.
         resolution: '360p', '720p' (default), '1080p' or '4k' (1080p/4k are upscaled).
         preset: e.g. 'shorts' (9:16) or 'youtube-thumbnail' (16:9).
+        camera: Camera move preset ('push-in', 'orbit', 'drone', 'handheld', ... see
+                flow_list_presets) or your own description.
         negative_prompt: Things to avoid (e.g. "no dialogue, no text").
         anchor_frame_path: Image to start from (image-to-video).
         last_frame_path: Image to end on (needs anchor_frame_path; interpolation).
@@ -474,15 +523,20 @@ async def flow_generate_video(
     if gate:
         return gate
 
-    text = _with_negative(prompt, negative_prompt)
-    images = [p for p in (anchor_frame_path, last_frame_path) if p] + refs
+    frames = [p for p in (anchor_frame_path, last_frame_path) if p]
+    text = prompt + (f"\nCamera: {presets.camera_phrase(camera)}." if camera else "")
+    text, tagged, used = project.expand(_active_project(), text, offset=len(frames) + len(refs),
+                                        max_images=max(0, 6 - len(frames) - len(refs)), per_ingredient=2)
+    text = _with_negative(text, negative_prompt)
+    images = frames + refs + tagged
     input_ = text if not images else [*(_image_part(p) for p in images), {"type": "text", "text": text}]
     out = config.output_dir(output_dir)
 
     paths, extra = await _tracked(
         tool="flow_generate_video", kind="video", count=1, model=model_id, prompt=prompt,
         params={"duration": duration, "aspect_ratio": aspect, "resolution": resolution,
-                "anchor": anchor_frame_path, "last_frame": last_frame_path, "references": refs},
+                "camera": camera, "anchor": anchor_frame_path, "last_frame": last_frame_path,
+                "references": refs, "ingredients": used},
         est_cost=est,
         work=lambda: _video(model=model_id, input_=input_,
                             response_format=_video_format(duration, aspect, resolution),
@@ -494,7 +548,7 @@ async def flow_generate_video(
 # ── Tool 5: Extend / edit a video ─────────────────────────────────────────────
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def flow_extend_video(
     prompt: str,
     video_path: Optional[str] = None,
@@ -565,7 +619,7 @@ async def flow_extend_video(
 # ── Tool 6: Image → Video Pipeline ───────────────────────────────────────────
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def flow_image_to_video(
     video_prompt: str,
     image_prompt: Optional[str] = None,
@@ -646,7 +700,7 @@ async def flow_image_to_video(
 # ── Tool 7-9: Presets, cost, usage ───────────────────────────────────────────
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def flow_list_presets() -> str:
     """List format presets, style presets, current models and limits."""
     lines = ["Format presets (preset=):"]
@@ -656,19 +710,27 @@ async def flow_list_presets() -> str:
     lines.append("\nStyle presets (style=):")
     for name, s in sorted(presets.all_styles().items()):
         lines.append(f"- {name}: {s}")
+    lines.append("\nCamera moves (camera=, or write your own):")
+    lines.append(", ".join(sorted(presets.CAMERA)))
     lines += [
+        "\nVideo prompt tips: say 'single continuous shot' to avoid cuts; time events with "
+        "'[0-4s] ... [4-8s] ...'; describe sound ('calm piano, no dialogue'); for edits keep it "
+        "short and add 'Keep everything else the same'.",
         "\nModels:",
         f"- fast: {config.image_model('fast')}",
         f"- pro: {config.image_model('pro')}",
         f"- lite: {config.image_model('lite')}",
         f"- default image model: {config.image_model(None)}",
         f"- video: {config.video_model()}",
+        f"- music: {config.music_model('clip')} (30 s clip), {config.music_model('song')} (full song)",
+        f"- narration: {config.tts_model()}",
+        f"- ffmpeg: {'found' if media.ffmpeg_exe() else 'NOT FOUND (needed for flow_assemble and video review)'}",
         "\nLimits: " + _limits_text(),
     ]
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def flow_estimate_cost(
     kind: str = "video",
     model: Optional[str] = None,
@@ -708,7 +770,7 @@ def _limits_text() -> str:
             f"ask before videos over ${config.video_confirm_usd():.2f}")
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 async def flow_usage_today() -> str:
     """Show today's generation count and estimated spend from the local log."""
     u = ledger.usage_today()
@@ -717,6 +779,10 @@ async def flow_usage_today() -> str:
         f"across {u['calls']} successful call(s).\nLimits: {_limits_text()}\nLog: {config.log_path()}"
     )
 
+
+# ── Studio tools (projects, storyboard, audio, review) ───────────────────────
+
+from . import studio  # noqa: E402,F401  (registers more tools on `mcp`)
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 

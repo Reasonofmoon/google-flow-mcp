@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "google-flow-mcp"
-version = "0.2.0"
-description = "MCP server giving Claude Desktop access to Nano Banana image and Gemini Omni video generation"
+version = "0.3.0"
+description = "Flow-style creative studio for MCP clients: storyboard films, consistent characters, video editing, music and narration on the Gemini API"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.11"
-keywords = ["mcp", "google-ai", "nano-banana", "gemini-omni", "claude", "image-generation", "video-generation"]
+keywords = ["mcp", "google-ai", "nano-banana", "gemini-omni", "lyria", "storyboard", "claude", "image-generation", "video-generation"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -20,8 +20,10 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "mcp[cli]>=1.0.0,<3",  # works with FastMCP (1.x) and MCPServer (2.x)
-    "google-genai>=3.3.0",  # Interactions API (Nano Banana + Gemini Omni)
+    "mcp[cli]>=1.12,<3",  # works with FastMCP (1.x) and MCPServer (2.x)
+    "google-genai>=3.3.0",  # Interactions API (Nano Banana, Gemini Omni, Lyria, TTS)
+    "Pillow>=10.1",  # previews and contact sheets
+    "imageio-ffmpeg>=0.5",  # bundled ffmpeg for review frames and film assembly
 ]
 
 [project.optional-dependencies]
