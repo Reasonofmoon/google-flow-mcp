@@ -134,8 +134,10 @@ def contact_sheet(items: Sequence[tuple[str, Optional[str | Path]]], cols: int =
             sheet.paste(fit, (x + (cell_w - fit.width) // 2, y + (cell_h - fit.height) // 2))
         text = label[:40]
         box = draw.textbbox((0, 0), text, font=font)
-        draw.rectangle([x, y, x + (box[2] - box[0]) + 12, y + (box[3] - box[1]) + 10], fill=(0, 0, 0))
-        draw.text((x + 6, y + 3), text, fill=(255, 255, 255), font=font)
+        lw, lh = (box[2] - box[0]) + 12, (box[3] - box[1]) + 10
+        top = y + cell_h - lh  # bottom-left, so it does not hide titles at the top of a frame
+        draw.rectangle([x, top, x + lw, y + cell_h], fill=(0, 0, 0))
+        draw.text((x + 6, top + 3), text, fill=(255, 255, 255), font=font)
     buf = io.BytesIO()
     sheet.save(buf, "JPEG", quality=76)
     return buf.getvalue()

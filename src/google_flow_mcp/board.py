@@ -21,7 +21,7 @@ h1{font-size:26px;margin:0 0 4px}h2{font-size:17px;margin:34px 0 12px;letter-spa
 .card p{margin:4px 0;font-size:13px;color:var(--mute)}.card p b{color:var(--ink);font-weight:600}
 .tag{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
 .empty{padding:36px 12px;text-align:center;color:var(--mute);background:repeating-linear-gradient(45deg,transparent,transparent 8px,var(--line) 8px,var(--line) 9px)}
-audio{width:100%;margin-top:6px}.film video{max-height:70vh}
+audio{width:100%;margin-top:6px}.film{max-width:720px}.film video{max-height:70vh}
 footer{margin-top:40px;color:var(--mute);font-size:12px}
 """
 
