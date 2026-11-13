@@ -60,25 +60,64 @@ def _first_image(value: Any) -> Optional[Image.Image]:
     return None
 
 
+def _ascii(text: str) -> str:
+    """The bundled font is Latin-only, so other scripts are shown as '?'."""
+    plain = text.replace("\u2014", "-").replace("\u2013", "-").replace("\u2019", "'").replace("\u00b7", "-")
+    return " ".join(plain.encode("ascii", "replace").decode().split())
+
+
+def _headline(text: str) -> tuple[str, str]:
+    """Split a prompt into a short headline (the shot) and the remaining detail."""
+    clean = text.strip()
+    for marker in ("\n", " Style:", ". "):
+        i = clean.find(marker)
+        if 12 <= i <= 110:
+            return clean[:i].strip(" ."), clean[i:].strip(" .\n")
+    return clean[:90], clean[90:].strip()
+
+
 def card(text: str, size: tuple[int, int], label: str) -> Image.Image:
-    """A gradient card whose color depends on the prompt, with the prompt written on it."""
+    """A small scene (sky, sun, hills) colored by the prompt, with the prompt as its caption."""
     w, h = size
     seed = hashlib.sha256(text.encode("utf-8")).digest()
-    top = (40 + seed[0] % 120, 40 + seed[1] % 120, 70 + seed[2] % 140)
-    bottom = (15 + seed[3] % 60, 15 + seed[4] % 60, 30 + seed[5] % 80)
+    top = (50 + seed[0] % 110, 60 + seed[1] % 110, 110 + seed[2] % 120)
+    bottom = (200 - seed[3] % 80, 150 - seed[4] % 70, 120 + seed[5] % 90)
     img = Image.new("RGB", (w, h))
     draw = ImageDraw.Draw(img)
     for y in range(h):
         t = y / max(1, h - 1)
         draw.line([(0, y), (w, y)], fill=tuple(int(top[i] * (1 - t) + bottom[i] * t) for i in range(3)))
-    draw.ellipse([w * 0.58, h * 0.12, w * 0.9, h * 0.12 + w * 0.32], fill=tuple(min(255, c + 70) for c in top))
-    font = _font(max(16, w // 34))
-    plain = text.replace("\u2014", "-").replace("\u2013", "-").replace("\u2019", "'")
-    body = "\n".join(textwrap.wrap(plain.encode("ascii", "replace").decode(), width=max(18, w // 13))[:7])
-    draw.multiline_text((w * 0.06, h * 0.42), body, fill=(255, 255, 255), font=font, spacing=6)
-    tag = _font(max(13, w // 48))
-    draw.rectangle([0, 0, w, max(26, h // 18)], fill=(0, 0, 0))
-    draw.text((10, 5), f"DEMO · {label} · no API call", fill=(255, 220, 90), font=tag)
+    r = int(min(w, h) * 0.13)
+    cx, cy = int(w * (0.56 + (seed[6] % 26) / 100)), int(h * (0.22 + (seed[7] % 12) / 100))
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 244, 214))
+    for layer, (base, shade) in enumerate(((0.60, 0.55), (0.72, 0.32))):
+        pts = [(0, h)]
+        for i in range(7):
+            pts.append((int(w * i / 6), int(h * (base + (seed[8 + layer * 7 + i] % 12) / 100))))
+        pts.append((w, h))
+        draw.polygon(pts, fill=tuple(int(c * shade) for c in top))
+
+    head, detail = _headline(text)
+    hs, ds = max(18, w // 26), max(12, w // 52)
+    head_lines = textwrap.wrap(_ascii(head), width=max(14, int(w * 0.88 / (hs * 0.56))))[:2]
+    detail_lines = textwrap.wrap(_ascii(detail), width=max(20, int(w * 0.88 / (ds * 0.56))))[:2]
+    pad = max(10, w // 60)
+    panel_h = int(pad * 2 + len(head_lines) * hs * 1.25 + len(detail_lines) * ds * 1.4)
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(overlay).rectangle([0, h - panel_h, w, h], fill=(8, 10, 18, 170))
+    img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+    draw = ImageDraw.Draw(img)
+    y = h - panel_h + pad
+    for line in head_lines:
+        draw.text((pad * 2, y), line, fill=(255, 255, 255), font=_font(hs))
+        y += int(hs * 1.25)
+    for line in detail_lines:
+        draw.text((pad * 2, y), line, fill=(196, 204, 224), font=_font(ds))
+        y += int(ds * 1.4)
+    bar = max(24, h // 20)
+    draw.rectangle([0, 0, w, bar], fill=(0, 0, 0))
+    draw.text((10, (bar - max(12, w // 56)) // 2 - 1), f"DEMO · {label} · no API call",
+              fill=(255, 220, 90), font=_font(max(12, w // 56)))
     return img
 
 
