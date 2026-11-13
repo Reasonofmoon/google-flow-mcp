@@ -2,6 +2,35 @@
 
 원본(upstream)과 다른 점만 적습니다. 원본 버전은 `upstream-v*` 태그를 보세요.
 
+## 0.3.0 - 2026-11-13 (Reasonofmoon fork) — Studio
+
+Google Flow 앱의 작업 방식(재료, 프레임에서 영상, 장면 이어 붙이기, 편집)을 Gemini API 위에 다시 만들었다.
+도구 9개 → 21개, 프롬프트 3개.
+
+### Added
+- **프로젝트** (`flow_project`): 재료·스토리보드·테이크·음성·완성 영상을 한 폴더(`projects/<이름>/`)에 보관. 다음 할 일 안내
+- **재료** (`flow_ingredient_save`): 인물·사물·장소·스타일을 저장하고 프롬프트에 `@이름`으로 부르면 참고 이미지와 설명이 자동으로 붙는다. 참고 시트 자동 생성 가능
+- **스토리보드** (`flow_storyboard_plan`, `flow_shot_update`, `flow_storyboard_keyframes`, `flow_storyboard_render`): 샷 목록 → 샷마다 싼 키프레임 → 키프레임을 첫 장면으로 영상 렌더. `draft`(360p) / `standard`(720p) / `high`(1080p)
+- **백그라운드 렌더**: 샷을 동시에 렌더하고, 정한 시간이 지나면 도구는 반환하되 렌더는 계속된다. `flow_project`로 진행 확인
+- **영상 편집** (`flow_edit_video`): 한 문장으로 추가·제거·스타일 변경. 스토리보드 샷을 편집하면 새 테이크로 쌓인다
+- **음악** (`flow_generate_music`, Lyria)과 **내레이션** (`flow_generate_narration`, Gemini TTS, 한국어 포함)
+- **합치기** (`flow_assemble`): 선택한 테이크를 이어 붙이고, 샷별 트림을 적용하고, 음악(반복·페이드아웃)과 내레이션을 섞는다. 로컬 ffmpeg, API 비용 없음
+- **눈으로 확인**: 이미지 도구가 미리보기를 함께 돌려주고, `flow_review`가 영상의 프레임 여러 장을 돌려준다. 어시스턴트가 결과를 직접 보고 판단할 수 있다
+- **보드** (`flow_board`): 프로젝트 전체를 보여 주는 HTML 한 장(재생기 포함)
+- **카메라 프리셋 18개** (`camera="push-in"`, `"orbit"`, `"drone"` 등), `flow_generate_video`에도 적용
+- **데모 모드** (`FLOW_DEMO=1`): API 키 없이 전체 흐름을 자리표시 미디어로 체험. 전송·과금 없음. `examples/offline_demo.py`
+- **MCP 프롬프트**: `short_film`, `product_ad`, `social_image_set`
+- `python -m google_flow_mcp` 실행 지원
+
+### Changed
+- 하루 한도 기본값: 이미지 100, 영상 20, **예산 $5**(전에는 이미지 50, 영상 5, 예산 없음). 여러 샷을 렌더할 수 있게 개수를 늘리고 금액으로 막는다
+- 의존성: `Pillow`(미리보기), `imageio-ffmpeg`(ffmpeg 내장) 추가, `mcp[cli]>=1.12,<3`
+- 도구가 문자열 또는 [문자열, 이미지]를 돌려준다(`FLOW_INLINE_PREVIEW=0`으로 끌 수 있음)
+
+### 검증
+- 테스트 49개, Python 3.11~3.13 × `mcp` 1.x/2.x. Google API는 mock, ffmpeg 이어 붙이기·믹싱·프레임 추출은 실제 실행, 실제 stdio 서버 프로세스와 JSON-RPC 통신, 데모 모드 전체 흐름
+- 실제 API 키로 한 생성은 아직 검증하지 않았다
+
 ## 0.2.0 - 2026-11-13 (Reasonofmoon fork)
 
 ### 바뀐 이유

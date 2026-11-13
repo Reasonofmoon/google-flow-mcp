@@ -1,3 +1,3 @@
-"""Google Flow MCP — Google AI image and video generation for Claude Desktop."""
+"""Google Flow MCP — Flow-style creative studio on the Gemini API for MCP clients."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
