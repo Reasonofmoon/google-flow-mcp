@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "google-flow-mcp"
-version = "0.3.2"
+version = "0.3.3"
 description = "Flow-style creative studio for MCP clients: storyboard films, consistent characters, video editing, music and narration on the Gemini API"
 readme = "README.md"
 license = { text = "Apache-2.0" }

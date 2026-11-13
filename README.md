@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/Reasonofmoon/google-flow-mcp/actions/workflows/ci.yml"><img src="https://github.com/Reasonofmoon/google-flow-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-49%20passing-5eead4" alt="49 tests passing">
+  <img src="https://img.shields.io/badge/tests-51%20passing-5eead4" alt="51 tests passing">
   <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-3776ab" alt="Python 3.11 to 3.13">
   <img src="https://img.shields.io/badge/MCP-1.x%20%7C%202.x-8ea8ff" alt="MCP 1.x and 2.x">
   <img src="https://img.shields.io/badge/tools-21-f59e0b" alt="21 tools">
@@ -17,7 +17,8 @@
   <a href="#try-it-without-an-api-key"><b>Try it free</b></a> ·
   <a href="#tools-21"><b>Tools</b></a> ·
   <a href="#install"><b>Install</b></a> ·
-  <a href="FORK.md"><b>한국어</b></a>
+  <a href="#troubleshooting"><b>Troubleshooting</b></a> ·
+  <a href="README.ko.md"><b>한국어</b></a>
 </p>
 
 Plan a storyboard, keep characters consistent, render shots, edit them, add music and a
@@ -226,8 +227,33 @@ Claude Desktop → `claude_desktop_config.json`:
 
 Config file: `%APPDATA%\Claude\claude_desktop_config.json` (Windows),
 `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS),
-`~/.config/Claude/claude_desktop_config.json` (Linux). Restart the app after editing.
-Then ask: *"Show me flow_list_presets."*
+`~/.config/Claude/claude_desktop_config.json` (Linux).
+
+**Quit the app completely** after editing (tray or menu bar icon → Quit; closing the window is not
+enough) and open it again. Then ask: *"Show me flow_list_presets."*
+
+Claude Code:
+
+```bash
+claude mcp add google-flow -s user \
+  -e GOOGLE_API_KEY=YOUR_PAID_GEMINI_API_KEY -e FLOW_OUTPUT_DIR=/path/to/output \
+  -- uv --directory /path/to/google-flow-mcp run google-flow-mcp
+```
+
+### Which API key
+
+Use a key from a Google AI Studio project that has **billing enabled** (shown as "Tier 1" or higher
+on the [API keys page](https://aistudio.google.com/api-keys)). Google's price list offers no free
+tier for the image, video and music models, so keys marked "Free tier" will not work for them.
+This free request shows whether the video model is visible to your key, without generating anything:
+
+```bash
+curl -s -H "x-goog-api-key: $GOOGLE_API_KEY" \
+  https://generativelanguage.googleapis.com/v1beta/models/gemini-omni-1.2-flash
+```
+
+A JSON description means the key can see the model; an error means it cannot. It does not check
+billing: that only shows on the first real generation.
 
 ### Check your install
 
@@ -260,6 +286,7 @@ No API key, nothing billed. Expect `SUMMARY 26/26 checks passed`.
 | `FLOW_RENDER_WAIT_SECONDS` / `FLOW_RENDER_CONCURRENCY` | `150` / `2` | Storyboard render behavior |
 | `FLOW_PRESETS_FILE`, `FLOW_PRICES_FILE` | — | Your own presets / price table (JSON) |
 | `FLOW_PROJECTS_DIR`, `FLOW_LOG_FILE`, `FLOW_FFMPEG` | — | Path overrides |
+| `FLOW_API_VERSION` | `v1beta` | Gemini API version. The video, music and TTS models are not on `v1` |
 
 Limits and spend are counted from the local `generation_log.jsonl`, not from Google's billing.
 
@@ -287,13 +314,32 @@ The server never deletes project files; re-rendering adds takes.
 - Images, video and audio carry Google's invisible SynthID watermark.
 - Some uploads are restricted by region or content (recognizable people, minors in the EEA/UK/CH).
 
+## Troubleshooting
+
+| What you see | Why | What to do |
+|---|---|---|
+| `404 ... Model 'gemini-omni-1.2-flash' not found` | Versions before 0.3.3 called the `v1` API, which does not have the video, music or TTS models | Update to 0.3.3 or later (`git pull`), then restart the client. `flow_list_presets` should show `Gemini API version: v1beta` |
+| `404` for `veo-3.1-generate-preview` | Veo 3.1 Preview was shut down on 2026-10-22. It is not a key problem | Use this server (Gemini Omni Flash) instead of the original 0.1.0 |
+| Two sets of `flow_*` tools, or the wrong one answers | The original `google-flow-mcp` 0.1.0 is still registered next to this one; both use the same tool names | Remove the old entry, for example `claude mcp remove google-flow -s user`, or delete it from `claude_desktop_config.json` |
+| `402` / "prepayment credits are depleted" | The key's project is prepaid and has no balance | Top up, or use a key from a project with billing and balance |
+| Image, video or music fails but `flow_generate_narration` works | Probably a free-tier key: only narration has a free tier | Use a key from a billing-enabled project (see [Which API key](#which-api-key)) |
+| `GOOGLE_API_KEY is not set` | No key in the server's `env` block, or the placeholder was left in | Add the key, or set `FLOW_DEMO=1` to try without one |
+| Changes to the config or code do not take effect | The client keeps the old server process alive | Quit the client completely and reopen it |
+| `NOT GENERATED YET. Estimated cost ...` | Not an error: the job is above `FLOW_VIDEO_CONFIRM_USD` | Say yes, and the assistant repeats the call with `confirm_cost=true` |
+| `Daily budget reached` | The local estimate passed `FLOW_DAILY_BUDGET_USD` (default $5) | Raise the limit in `env`, or continue tomorrow |
+
+Every call, including failures and their error text, is written to
+`<FLOW_OUTPUT_DIR>/generation_log.jsonl`. Attach the relevant lines when you open an issue.
+
 ## Status
 
-Alpha. CI runs on Linux (Python 3.11–3.13, `mcp` 1.x and 2.x), Windows and macOS: 49 tests that
+Alpha. CI runs on Linux (Python 3.11–3.13, `mcp` 1.x and 2.x), Windows and macOS: 51 tests that
 mock Google's API and run ffmpeg and Pillow for real, plus the stdio smoke test above against a
-live server process. Request shapes follow the official docs as of 2026-11-13;
-**no live API generation has been verified yet**, so please open an issue if a real call behaves
-differently.
+live server process.
+
+Live API status as of 2026-11-13: the first real call (video) failed with the API-version bug that
+0.3.3 fixes. **A successful live generation with 0.3.3 has not been confirmed yet.** Request
+shapes follow the official docs; please open an issue if a real call behaves differently.
 
 ```bash
 pip install -e ".[dev]" && pytest -v
